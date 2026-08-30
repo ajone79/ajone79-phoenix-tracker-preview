@@ -73,7 +73,7 @@
   }
 
   .controls{
-    position:sticky; top:36px; z-index:20;
+    position:sticky; top:0; z-index:20;
     background:rgba(10,13,18,0.96);
     backdrop-filter:blur(6px);
     border-bottom:1px solid var(--border);
@@ -95,6 +95,16 @@
     font-size:13px;
   }
   select:focus, input:focus{outline:2px solid var(--blue); outline-offset:1px;}
+
+  .adv-toggle{
+    font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase;
+    background:transparent; border:1px solid var(--border); color:var(--muted);
+    border-radius:6px; padding:7px 12px; cursor:pointer; margin-left:auto;
+  }
+  .adv-toggle:hover{ color:var(--text); border-color:var(--muted); }
+  .adv-filters{ display:flex; flex-direction:column; gap:10px; }
+  .adv-filters.collapsed{ display:none; }
+
   .chip{
     font-family:var(--mono); font-size:11px; letter-spacing:.03em;
     padding:6px 10px; border-radius:20px;
@@ -222,16 +232,19 @@
     </div>
     <button class="btn" id="jumpToday">Jump to today</button>
     <a class="btn primary" href="gantt-events.html">View as Gantt chart</a>
+    <button class="adv-toggle" id="advToggle">Advanced Filters ▾</button>
   </div>
-  <div class="row">
-    <span class="field-label" style="width:100%;">Ops Level (tap one to isolate, tap again for all)</span>
+  <div class="adv-filters collapsed" id="advFilters">
+    <div class="row">
+      <span class="field-label" style="width:100%;">Ops Level (tap one to isolate, tap again for all)</span>
+    </div>
+    <div class="row" id="gradeChipRow"></div>
+    <div class="row">
+      <span class="field-label">Timezone</span>
+      <select id="tzSelect"></select>
+    </div>
+    <div class="row" id="keyChipRow"></div>
   </div>
-  <div class="row" id="gradeChipRow"></div>
-  <div class="row">
-    <span class="field-label">Timezone</span>
-    <select id="tzSelect"></select>
-  </div>
-  <div class="row" id="keyChipRow"></div>
 </div>
 
 <main id="dayList"></main>
@@ -640,4 +653,21 @@ async function loadDataAndInit(){
 loadDataAndInit();
 </script>
 </body>
+<script>
+(function(){
+  const KEY = 'phx_advFiltersOpen_calendar';
+  const btn = document.getElementById('advToggle');
+  const panel = document.getElementById('advFilters');
+  function apply(open){
+    panel.classList.toggle('collapsed', !open);
+    btn.textContent = 'Advanced Filters ' + (open ? '▴' : '▾');
+  }
+  apply(localStorage.getItem(KEY) === '1');
+  btn.addEventListener('click', () => {
+    const nowOpen = panel.classList.contains('collapsed');
+    apply(nowOpen);
+    localStorage.setItem(KEY, nowOpen ? '1' : '0');
+  });
+})();
+</script>
 </html>
