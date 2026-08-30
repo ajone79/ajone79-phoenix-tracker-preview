@@ -500,14 +500,16 @@ function render(){
     // it, show it on the earliest visible day instead. Something that's genuinely
     // finished before the window even starts is still dropped.
     let bucketDateISO = startZ.dateISO;
+    let startedBeforeVisibleWindow = false;
     if(bucketDateISO < winStart){
       const endMs = ev.endUTC ? new Date(ev.endUTC).getTime() : new Date(ev.startUTC).getTime();
       if(endMs < nowMs) return;
       bucketDateISO = winStart;
+      startedBeforeVisibleWindow = true;
     }
 
     const endZ = ev.endUTC ? toZoned(ev.endUTC, tzValue) : null;
-    (byDay[bucketDateISO] = byDay[bucketDateISO] || []).push({ev, startZ, endZ, opsMin, opsMax});
+    (byDay[bucketDateISO] = byDay[bucketDateISO] || []).push({ev, startZ, endZ, opsMin, opsMax, startedBeforeVisibleWindow});
   });
 
   Object.values(byDay).forEach(list => list.sort((a,b) => a.startZ.h*60+a.startZ.m - (b.startZ.h*60+b.startZ.m)));
@@ -554,14 +556,15 @@ function render(){
       empty.textContent = 'No matching events for this day.';
       card.appendChild(empty);
     } else {
-      list.forEach(({ev, startZ, endZ, opsMin, opsMax}) => {
+      list.forEach(({ev, startZ, endZ, opsMin, opsMax, startedBeforeVisibleWindow}) => {
         const catDef = GAME_CATS[ev.displayType] || GAME_CATS[''];
         const row = document.createElement('div');
         row.className = 'event-row';
         const opsLabel = opsMax>=999 ? (opsMin+'+') : (opsMin+'–'+opsMax);
+        const startLabel = startedBeforeVisibleWindow ? dateLabelShort(startZ.dateISO)+' '+fmtTime(startZ.h, startZ.m) : fmtTime(startZ.h, startZ.m);
         const timeLabel = endZ
-          ? fmtTime(startZ.h, startZ.m) + ' → ' + (endZ.dateISO !== startZ.dateISO ? dateLabelShort(endZ.dateISO)+' ' : '') + fmtTime(endZ.h, endZ.m)
-          : fmtTime(startZ.h, startZ.m);
+          ? startLabel + ' → ' + (endZ.dateISO !== startZ.dateISO ? dateLabelShort(endZ.dateISO)+' ' : '') + fmtTime(endZ.h, endZ.m)
+          : startLabel;
         const fullDesc = ev.description || '';
         const isLong = fullDesc.length > DESC_TRUNCATE_LEN;
         const shortDesc = isLong ? truncate(fullDesc, DESC_TRUNCATE_LEN) : fullDesc;
