@@ -124,6 +124,8 @@ let batchStatuses = []; // {label, state, message}  -- legacy, no longer used fo
 let pendingDeleteEventId = null;
 let activeJob = null;
 let jobPollTimer = null;
+let inviteTokens = [];
+let newInviteLabel = '';
 
 function eventThresholdRowHtml(e){
   const isPendingDelete = pendingDeleteEventId === e.id;
@@ -215,13 +217,14 @@ async function init(){
 }
 
 async function loadData(){
-  const [{data:p}, {data:r}, {data:a}, {data:e}, {data:ar}, {data:rq}] = await Promise.all([
+  const [{data:p}, {data:r}, {data:a}, {data:e}, {data:ar}, {data:rq}, {data:inv}] = await Promise.all([
     sb.from('tracker_profiles').select('*').order('approved', {ascending:true}).order('created_at', {ascending:false}),
     sb.from('roster').select('id,name,level').order('name'),
     sb.from('tracker_admin_allowlist').select('*').order('in_game_name'),
     sb.from('events').select('id,name,date,arc_id,scoring_type,completion_mode,threshold,is_test').order('date', {ascending:false}),
     sb.from('arcs').select('id,name,status').order('end_date', {ascending:false}),
-    sb.from('roster_sync_review').select('*').eq('resolved', false).order('created_at', {ascending:false})
+    sb.from('roster_sync_review').select('*').eq('resolved', false).order('created_at', {ascending:false}),
+    sb.from('invite_tokens').select('*').order('created_at', {ascending:false})
   ]);
   profiles = p || [];
   roster = r || [];
@@ -229,6 +232,80 @@ async function loadData(){
   events = e || [];
   arcs = ar || [];
   reviewQueue = rq || [];
+  inviteTokens = inv || [];
+}
+
+function inviteTokenRowHtml(t){
+  const link = location.origin + '/login.html?invite=' + encodeURIComponent(t.token);
+  const usesLabel = t.max_uses ? `${t.use_count}/${t.max_uses} uses` : `${t.use_count} use${t.use_count===1?'':'s'} (unlimited)`;
+  const expiredNow = t.expires_at && new Date(t.expires_at) < new Date();
+  const maxedOut = t.max_uses && t.use_count >= t.max_uses;
+  const dead = t.revoked || expiredNow || maxedOut;
+  const statusLabel = t.revoked ? 'Revoked' : expiredNow ? 'Expired' : maxedOut ? 'Used up' : 'Active';
+  return `
+    <div class="row" style="align-items:flex-start;flex-direction:column;gap:6px;${dead?'opacity:.55;':''}">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%;">
+        <span class="tag ${dead?'':'approved'}" style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:${dead?'var(--hair)':'var(--mint)'};color:${dead?'var(--text-dim)':'var(--void)'};">${statusLabel}</span>
+        <b style="font-size:12.5px;">${escapeHtml(t.label || '(no label)')}</b>
+        <span style="font-size:10.5px;color:var(--text-faint);">${usesLabel}</span>
+        ${t.expires_at ? `<span style="font-size:10.5px;color:var(--text-faint);">expires ${new Date(t.expires_at).toLocaleDateString('en-GB')}</span>` : ''}
+      </div>
+      <input type="text" readonly value="${escapeHtml(link)}" style="width:100%;font-size:11px;" onclick="this.select();">
+      <div class="row" style="gap:6px;">
+        ${!t.revoked ? `<button class="btn force" data-revokeinvite="${t.id}">Revoke</button>` : ''}
+        <button class="btn force" data-deleteinvite="${t.id}">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function inviteSectionHtml(){
+  return `
+    <h2>🔗 Invite Links</h2>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Anyone who signs in via one of these links is approved automatically — no need to wait for an officer. Good for handing to a specific new recruit or a small batch, not for posting publicly.</div>
+    <div class="import-box" style="margin-bottom:14px;">
+      <div class="import-row">
+        <div class="field-group"><span class="field-label">Label</span><input type="text" id="newInviteLabelInput" placeholder="e.g. new recruits Aug 2026" style="width:220px;"></div>
+        <div class="field-group"><span class="field-label">Max uses (blank = unlimited)</span><input type="number" id="newInviteMaxUses" style="width:100px;" min="1"></div>
+        <div class="field-group"><span class="field-label">Expires in days (blank = never)</span><input type="number" id="newInviteExpiresDays" style="width:100px;" min="1"></div>
+        <button class="btn save-all" id="createInviteBtn">Create link</button>
+      </div>
+    </div>
+    <div id="inviteTokensList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px;">
+      ${inviteTokens.length ? inviteTokens.map(inviteTokenRowHtml).join('') : '<div class="empty">No invite links yet.</div>'}
+    </div>
+  `;
+}
+
+async function createInviteToken(){
+  const label = document.getElementById('newInviteLabelInput').value.trim();
+  const maxUsesRaw = document.getElementById('newInviteMaxUses').value;
+  const expiresDaysRaw = document.getElementById('newInviteExpiresDays').value;
+  const payload = {
+    label,
+    created_by: me.id,
+    max_uses: maxUsesRaw ? parseInt(maxUsesRaw) : null,
+    expires_at: expiresDaysRaw ? new Date(Date.now() + parseInt(expiresDaysRaw) * 86400000).toISOString() : null,
+  };
+  const { error } = await sb.from('invite_tokens').insert(payload);
+  if (error) { alert('Failed to create invite link: ' + error.message); return; }
+  await loadData();
+  render();
+}
+
+async function revokeInviteToken(id){
+  const { error } = await sb.from('invite_tokens').update({ revoked: true }).eq('id', id);
+  if (error) { alert('Failed to revoke: ' + error.message); return; }
+  await loadData();
+  render();
+}
+
+async function deleteInviteToken(id){
+  if (!confirm('Delete this invite link permanently?')) return;
+  const { error } = await sb.from('invite_tokens').delete().eq('id', id);
+  if (error) { alert('Failed to delete: ' + error.message); return; }
+  await loadData();
+  render();
 }
 
 function nextRosterId(){
@@ -329,6 +406,8 @@ function render(){
     <main>
       <p style="font-size:11.5px;color:#8a8a94;">Signed in as <b>${escapeHtml(me.discord_username)}</b>. Approve pending Discord logins below and, since Discord names rarely match in-game names, type the correct in-game name next to each person yourself — matching this list against the roster.</p>
 
+      ${inviteSectionHtml()}
+
       ${reviewQueue.length > 0 ? `
       <h2>🔔 Roster Sync Review (${reviewQueue.length})</h2>
       <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Flagged automatically by the stfc.pro sync every 6 hours — new/unmatched players, possible departures, and low-confidence name matches. Renames are applied automatically already (shown here just for your audit trail); everything else waits for you to act.</div>
@@ -411,6 +490,11 @@ function render(){
   document.querySelectorAll('[data-addmember]').forEach(b=>b.addEventListener('click', ()=>addMemberFromReview(b.dataset.addmember)));
   document.querySelectorAll('[data-markinactive]').forEach(b=>b.addEventListener('click', ()=>markInactiveFromReview(b.dataset.markinactive, b.dataset.rosterid)));
   document.querySelectorAll('[data-dismissreview]').forEach(b=>b.addEventListener('click', ()=>dismissReview(b.dataset.dismissreview)));
+
+  const createInviteBtn = document.getElementById('createInviteBtn');
+  if (createInviteBtn) createInviteBtn.addEventListener('click', createInviteToken);
+  document.querySelectorAll('[data-revokeinvite]').forEach(b=>b.addEventListener('click', ()=>revokeInviteToken(b.dataset.revokeinvite)));
+  document.querySelectorAll('[data-deleteinvite]').forEach(b=>b.addEventListener('click', ()=>deleteInviteToken(b.dataset.deleteinvite)));
 
   wireImportSection();
 
