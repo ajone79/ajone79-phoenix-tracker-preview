@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="assets/phx-nav-rail.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/tracker-auth.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Phoenix EU168</title>
@@ -8,30 +12,35 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon-eu168.png">
 <link rel="apple-touch-icon" href="/icon-eu168.png">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/tracker-auth.js"></script>
-<script src="assets/phx-nav-menu.js"></script>
-<script src="assets/game-events-data.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-eu168.png">
+<link rel="apple-touch-icon" href="/icon-eu168.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
   :root{
-    --void:#050507; --panel:#111116; --panel-2:#17171e; --hair:#2a2a34;
-    --signal:#ff9142; --periwinkle:#8fa3ff; --mint:#5fd068; --gold:#ffc857;
-    --text:#e8e6e1; --text-dim:#8a8a94; --text-faint:#55555f;
+    --bg: #0a0d16;
+    --panel: #121729;
+    --panel-2: #171d33;
+    --line: #262e4a;
+    --amber: #f2a93b;
+    --amber-dim: #7a5a24;
+    --teal: #4fd1c5;
+    --text: #e7ecf3;
+    --muted: #8b93a7;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;background:var(--void);color:var(--text);font-family:'Space Mono',monospace;-webkit-font-smoothing:antialiased;min-height:100vh;}
-  body{position:relative;}
-  body::before{
-    content:'';
-    position:fixed; inset:0;
-    background:url('icon-eu168.png') no-repeat center 60%;
-    background-size:min(70vw,640px);
-    opacity:.5;
-    pointer-events:none;
-    z-index:0;
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Rajdhani', sans-serif;
+    font-size:16px;
+    line-height:1.5;
   }
-  .topbar, main{position:relative; z-index:1;}
+  h1,h2,h3{ font-family:'Orbitron', sans-serif; letter-spacing:.04em; }
+  a{ color:var(--teal); }
+
   .phx-nav{
     position:sticky; top:0; z-index:9999;
     display:flex; align-items:center; gap:4px;
@@ -51,261 +60,488 @@
   }
   .phx-nav a:hover{ color:#e8e6e1; background:rgba(255,255,255,.06); }
   .phx-nav a.current{ color:#0a0a0d; background:#f2a93b; font-weight:700; }
-  .topbar{display:flex;align-items:stretch;height:70px;}
-  .elbow{width:130px;background:var(--signal);border-bottom-left-radius:36px;display:flex;align-items:center;justify-content:flex-end;padding-right:16px;}
-  .elbow span{font-family:'Antonio',sans-serif;font-weight:700;color:var(--void);font-size:14px;letter-spacing:.08em;}
-  .topbar-bar{flex:1;background:var(--panel);display:flex;align-items:center;padding:0 24px;border-bottom:2px solid var(--hair);}
-  .topbar-title{font-family:'Antonio',sans-serif;font-weight:700;font-size:24px;letter-spacing:.05em;}
-  .topbar-title b{color:var(--signal);}
-  .topbar-sub{font-size:11px;color:var(--text-dim);margin-top:2px;}
-  main{padding:34px 30px 60px;max-width:960px;margin:0 auto;}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:10px;}
-  .tile{display:block;background:rgba(17,17,22,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);border:1px solid var(--hair);border-radius:14px;padding:22px 20px;text-decoration:none;color:var(--text);transition:border-color .15s ease, transform .1s ease, background .15s ease;position:relative;overflow:hidden;}
-  .tile:hover{border-color:var(--signal);transform:translateY(-2px);background:rgba(17,17,22,.68);}
-  .tile-icon{font-size:26px;margin-bottom:10px;display:block;}
-  .tile-name{font-family:'Antonio',sans-serif;font-weight:700;font-size:16px;letter-spacing:.03em;margin-bottom:6px;}
-  .tile-desc{font-size:11px;color:var(--text-dim);line-height:1.5;}
-  .tile-badge{position:absolute;top:14px;right:14px;font-size:8.5px;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em;}
-  .tile-badge.public{background:rgba(95,208,104,.15);color:var(--mint);}
-  .tile-badge.wip{background:rgba(255,200,87,.15);color:var(--gold);}
-  h2.sec{font-family:'Antonio',sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint);margin:30px 0 4px;}
 
-  /* ===== header ticker: next territory captures + upcoming events ===== */
-  .phx-ticker{
-    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
-    background:#111116; border-bottom:2px solid #2a2a34;
-    padding:7px 22px; font-family:ui-monospace,'SF Mono','Consolas',monospace; font-size:11.5px;
-    color:#e8e6e1; flex-shrink:0; position:relative; z-index:1;
+  main{ max-width:900px; margin:0 auto; padding:24px 16px 60px; position:relative; }
+
+  .section-head{ text-align:center; margin-bottom:8px; }
+  .section-head h1{ font-size:26px; margin:0 0 4px; }
+  .section-head .accent{ color:var(--amber); }
+  .section-desc{ color:var(--muted); font-size:13px; text-align:center; }
+
+  .quick-nav{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    margin:16px 0 6px;
   }
-  .tc-group{ display:flex; align-items:center; gap:14px; flex-shrink:0; flex-wrap:wrap; }
-  .tc-next{ display:flex; align-items:center; gap:7px; }
-  .tc-next .tc-label{
-    color:#0a0a0d; background:#5fd068; font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:10px;
-    padding:2px 7px; border-radius:4px; flex-shrink:0;
+  .quick-nav a{
+    text-decoration:none; font-size:12.5px; font-weight:600;
+    color:var(--teal); background:var(--panel-2);
+    border:1px solid var(--line); border-radius:20px;
+    padding:6px 14px;
   }
-  .tc-next.tc-then .tc-label{ background:#8fa3ff; }
-  .tc-next .tc-name{ font-weight:700; }
-  .tc-next .tc-countdown{ color:#5fd068; }
-  .tc-next.tc-then .tc-countdown{ color:#8fa3ff; }
-  .ev-ticker-wrap{
-    flex:1; min-width:200px; display:flex; align-items:center; gap:7px;
-    border-left:1px solid #2a2a34; padding-left:16px; overflow:hidden;
+  .quick-nav a:hover{ border-color:var(--teal); color:var(--text); }
+
+  .wip-banner{
+    background:linear-gradient(90deg, rgba(235,87,87,.12), rgba(235,87,87,.04));
+    border:1px solid rgba(235,87,87,.4);
+    border-left:3px solid #eb5757;
+    border-radius:8px;
+    padding:10px 14px;
+    font-size:13px;
+    color:#f2a9a9;
+    margin:18px 0 26px;
   }
-  .ev-ticker-wrap .ev-label{
-    color:#8a8a94; font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:10px; flex-shrink:0;
+
+  section.block{
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:18px 18px 20px;
+    margin-bottom:22px;
   }
-  #evTicker{
-    color:#8fa3ff; opacity:1; transition:opacity .4s ease;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  section.block h2{
+    font-size:16px; color:var(--amber); margin:0 0 4px;
+    text-transform:uppercase; letter-spacing:.06em;
   }
-  #evTicker .ev-sep{ color:#55555f; margin:0 8px; }
-  #evTicker.fade{ opacity:0; }
-  @media (max-width:820px){ .phx-ticker{ padding:7px 12px; font-size:10.5px; gap:10px;} .ev-ticker-wrap{ padding-left:10px; } .tc-group{ gap:8px; } }
+  section.block .block-sub{ color:var(--muted); font-size:12.5px; margin-bottom:14px; }
+
+  .event-card{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:12px 14px;
+    margin-bottom:12px;
+  }
+  .event-card:last-child{ margin-bottom:0; }
+  .event-title{
+    font-weight:700; font-size:13.5px; color:var(--text);
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:8px;
+  }
+  .event-date{ color:var(--muted); font-size:11.5px; font-weight:500; }
+
+  .code-row{
+    display:flex; flex-wrap:wrap; gap:8px 14px;
+    align-items:center;
+    padding:6px 0;
+    border-top:1px solid var(--line);
+    font-size:13px;
+  }
+  .code-row:first-of-type{ border-top:none; }
+  .grade-tag{
+    background:rgba(242,169,59,.12); border:1px solid var(--amber-dim);
+    color:var(--amber); font-family:'Share Tech Mono', monospace;
+    font-size:11.5px; padding:2px 8px; border-radius:5px;
+    min-width:70px; text-align:center;
+  }
+  .code-val{
+    font-family:'Share Tech Mono', monospace; color:var(--teal);
+    font-weight:700; letter-spacing:.03em;
+  }
+  .code-reward{ color:var(--muted); font-size:12px; }
+  .code-notes{ color:var(--muted); font-size:11.5px; font-style:italic; width:100%; margin-top:2px; }
+
+  .day-label{
+    font-family:'Share Tech Mono', monospace; color:var(--amber);
+    font-size:11.5px; margin:10px 0 4px; text-transform:uppercase;
+  }
+  .day-label:first-child{ margin-top:0; }
+  .trivia-row{
+    display:flex; gap:10px; align-items:baseline;
+    padding:4px 0; font-size:13px;
+  }
+  .trivia-part{ color:var(--muted); font-size:11.5px; min-width:110px; }
+  .trivia-clue{ color:var(--text); font-weight:600; }
+  .trivia-answer{ color:var(--teal); }
+
+  .placeholder-note{
+    color:var(--muted); font-size:13px; text-align:center;
+    padding:26px 10px; border:1px dashed var(--line); border-radius:8px;
+  }
+
+  .gallery{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+    gap:14px;
+  }
+  .gallery-card{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:hidden;
+    cursor:pointer;
+    transition:border-color .15s ease;
+  }
+  .gallery-card:hover{ border-color:var(--amber-dim); }
+  .gallery-card img{
+    width:100%; height:140px; object-fit:cover; display:block;
+    background:var(--panel);
+  }
+  .gallery-card .gc-body{ padding:10px 12px 12px; }
+  .gallery-card .gc-title{ font-weight:700; font-size:13.5px; margin-bottom:3px; }
+  .gallery-card .gc-caption{ color:var(--muted); font-size:11.5px; line-height:1.4; margin-bottom:6px; }
+  .gallery-card .gc-credit{ color:var(--teal); font-size:11px; }
+
+  .glightbox{
+    position:fixed; inset:0; z-index:70;
+    background:rgba(4,6,12,.94);
+    display:none; align-items:center; justify-content:center;
+    padding:24px; flex-direction:column; gap:10px;
+  }
+  .glightbox.open{ display:flex; }
+  .glightbox img{ max-width:92vw; max-height:78vh; border-radius:8px; border:1px solid var(--line); }
+  .glightbox .gl-caption{ color:var(--text); font-size:13px; text-align:center; max-width:640px; }
+  .glightbox .gl-credit{ color:var(--teal); font-size:12px; }
+  .glightbox .gl-close{
+    position:absolute; top:18px; right:22px;
+    color:var(--muted); font-size:26px; cursor:pointer; line-height:1;
+  }
+  .glightbox .gl-close:hover{ color:var(--text); }
+
+  footer{
+    text-align:center; color:var(--muted); font-size:11.5px;
+    padding:24px 16px; border-top:1px solid var(--line);
+  }
+  footer a{ color:var(--teal); }
+
+  .wip-watermark{
+    position:fixed; inset:0; pointer-events:none; z-index:5;
+    overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .wip-watermark span{
+    font-family:'Orbitron', sans-serif; font-weight:800;
+    font-size:13vw; color:rgba(242,169,59,.05);
+    white-space:nowrap; transform:rotate(-28deg);
+    letter-spacing:.05em;
+  }
+
+.hero-ticker{ display:flex; align-items:center; gap:10px; height:22px; overflow:hidden; background:rgba(242,169,59,.06); border-bottom:1px solid rgba(242,169,59,.25); padding:0 10px; }
+.hero-ticker-label{ flex:0 0 auto; color:#f2a93b; font-weight:700; font-size:10.5px; letter-spacing:.07em; font-family:'Share Tech Mono', 'Space Mono', monospace; white-space:nowrap; }
+.hero-ticker-scroll{ flex:1 1 auto; overflow:hidden; white-space:nowrap; height:100%; position:relative; }
+.hero-ticker .htrack{ display:inline-block; font-family:'Share Tech Mono', 'Space Mono', monospace; font-size:11px; line-height:22px; animation-name:heroTickerScroll; animation-timing-function:linear; animation-iteration-count:infinite; }
+.hero-ticker .hgrouphead{ color:#f2a93b; font-weight:700; letter-spacing:.05em; }
+.hero-ticker .hname{ color:#f2a93b; font-weight:700; }
+.hero-ticker .hscore{ color:#4fd1c5; }
+@keyframes heroTickerScroll{ 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
 </style>
 </head>
 <body>
-<nav class="phx-nav"><span class="phx-nav-tag">PHX</span><a href="index.html" class="current">🏠 Home</a></nav>
-<div class="topbar">
-  <div class="elbow"><span>PHX</span></div>
-  <div class="topbar-bar">
-    <div>
-      <div class="topbar-title"><b>PHOENIX</b> EU168</div>
-      <div class="topbar-sub">Alliance tools &amp; resources</div>
-    </div>
-  </div>
-</div>
-<div class="phx-ticker">
-  <div class="tc-group">
-    <div class="tc-next" id="tcNext"><span class="tc-label">Next Capture</span><span>Loading…</span></div>
-    <div class="tc-next tc-then" id="tcThen"><span class="tc-label">Then</span><span>Loading…</span></div>
-  </div>
-  <div class="ev-ticker-wrap"><span class="ev-label">Also Upcoming</span><span id="evTicker">Loading…</span></div>
-</div>
+
+<div class="wip-watermark"><span>WORK IN PROGRESS</span></div>
+
+<div class="hero-ticker"><span class="hero-ticker-label">🏆 ALLIANCE HEROES</span><div class="hero-ticker-scroll" id="heroTicker"></div></div>
+
 <main>
-  <h2 class="sec">Alliance (login required)</h2>
-  <div class="grid">
-    <a class="tile" href="alb-participation.html">
-      <span class="tile-icon">📊</span>
-      <div class="tile-name">ALB Participation</div>
-      <div class="tile-desc">Event scores, completion rates, and grade breakdowns.</div>
-    </a>
-    <a class="tile" href="game-events.html">
-      <span class="tile-icon">🗓️</span>
-      <div class="tile-name">Events Calendar</div>
-      <div class="tile-desc">Upcoming and past alliance events at a glance.</div>
-    </a>
-    <a class="tile" href="crewing.html">
-      <span class="tile-icon">🖖</span>
-      <div class="tile-name">Crewing</div>
-      <div class="tile-desc">Recommended officer crews for hostiles and armadas.</div>
-    </a>
-    <a class="tile" href="idiq-hints-and-tips.html">
-      <span class="tile-icon">💡</span>
-      <div class="tile-name">IDIQ Hints &amp; Tips</div>
-      <div class="tile-desc">Guidance and strategy for the current story arc.</div>
-    </a>
-    <a class="tile" href="sheets/stfc-sheets.html">
-      <span class="tile-icon">📑</span>
-      <div class="tile-name">STFC Sheets</div>
-      <div class="tile-desc">Custom spreadsheet tools for alliance planning and calculations.</div>
-    </a>
-    <a class="tile" href="credits.html">
-      <span class="tile-icon">🔗</span>
-      <div class="tile-name">Links &amp; Credits</div>
-      <div class="tile-desc">Useful external links and who to thank.</div>
-    </a>
+  <div class="section-head">
+    <h1>Alliance <span class="accent">Briefing</span></h1>
+    <div class="section-desc">Current arc overview, suggested crews, promo codes &amp; trivia answers — updated as the game moves.</div>
   </div>
 
-  <h2 class="sec">Community (public)</h2>
-  <div class="grid">
-    <a class="tile" href="f2p-task-guide.html">
-      <span class="tile-badge public">Public</span>
-      <span class="tile-icon">🎯</span>
-      <div class="tile-name">F2P Task Guide</div>
-      <div class="tile-desc">Free-to-play task tracker, open to the whole STFC community.</div>
-    </a>
-    <a class="tile" href="fleet-commanders.html">
-      <span class="tile-badge wip">WIP</span>
-      <span class="tile-icon">🧭</span>
-      <div class="tile-name">Fleet Commanders</div>
-      <div class="tile-desc">Find the best FC for your goal — solo armadas, research, PVP and more.</div>
-    </a>
+  <div class="quick-nav">
+    <a href="#overview">Arc Overview</a>
+    <a href="#crews">Suggested Crews</a>
+    <a href="#promo">Promo Codes</a>
+    <a href="#trivia">Trivia Answers</a>
   </div>
 
-  <div id="adminSection" style="display:none;">
-    <h2 class="sec">Admin</h2>
-    <div class="grid">
-      <a class="tile" href="admin.html" style="border-color:var(--gold);">
-        <span class="tile-icon">🛠️</span>
-        <div class="tile-name">Access Admin</div>
-        <div class="tile-desc">Approve pending logins, map Discord names to in-game names, manage admins.</div>
-      </a>
-    </div>
-  </div>
+  <div class="wip-banner">🚧 This whole page is a work in progress. Everything below — arc overview, suggested crews, promo codes, and trivia — is <strong>placeholder content</strong> to preview the layout, not confirmed data for this arc. Real content will replace it as it's finalised.</div>
+
+  <section class="block" id="overview">
+    <h2>Arc Overview</h2>
+    <div class="block-sub">What this arc is about, key mechanics, and timeline. Tap a card to view full size.</div>
+    <div class="gallery" id="overviewGallery"></div>
+  </section>
+
+  <section class="block" id="crews">
+    <h2>Suggested Crews</h2>
+    <div class="block-sub">Recommended officer crews for this arc's content. Tap a card to view full size.</div>
+    <div class="gallery" id="crewsGallery"></div>
+  </section>
+
+  <section class="block" id="promo">
+    <h2>Promo Codes</h2>
+    <div class="block-sub">Grouped by release. Enter for your grade/ops range — codes sometimes show an error but still apply the reward, check AMS to confirm.</div>
+    <div id="promoContainer"><div class="placeholder-note">Loading…</div></div>
+  </section>
+
+  <section class="block" id="trivia">
+    <h2>Trivia Answers</h2>
+    <div class="block-sub">Answers for in-game trivia / shifting-trial style events.</div>
+    <div id="triviaContainer"><div class="placeholder-note">Loading…</div></div>
+  </section>
 </main>
+
+<div class="glightbox" id="glightbox">
+  <div class="gl-close" id="glClose">✕</div>
+  <img id="glImg" src="" alt="">
+  <div class="gl-caption" id="glCaption"></div>
+  <div class="gl-credit" id="glCredit"></div>
+</div>
+
+<footer>
+  Data updates automatically from the shared alliance database. Spotted a mistake? Let me know on Discord: <a href="https://discord.gg/6ecSvxcFjT" target="_blank" rel="noopener">discord.gg/6ecSvxcFjT</a>
+</footer>
+
 <script>
-  function showAdminTileIfAdmin(profile){
-    if (profile && profile.is_admin) {
-      document.getElementById('adminSection').style.display = '';
-    }
+const SUPABASE_URL = 'https://mmzizgsanwqjpiumpqay.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1teml6Z3NhbndxanBpdW1wcWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjk5MzksImV4cCI6MjEwMTYwNTkzOX0.KqvY2Ib33J8h8ztEi8qxtfutSdVIPAaJRtj7cSUSKFM';
+
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function sb(path){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+  });
+  if(!res.ok) throw new Error(`${path} fetch failed: ${res.status}`);
+  return res.json();
+}
+
+function groupBy(arr, keyFn){
+  const map = new Map();
+  for(const item of arr){
+    const key = keyFn(item);
+    if(!map.has(key)) map.set(key, []);
+    map.get(key).push(item);
   }
-  document.addEventListener('tracker-auth-ready', (e) => showAdminTileIfAdmin(e.detail));
-  if (window.__trackerProfile) showAdminTileIfAdmin(window.__trackerProfile);
+  return map;
+}
 
-  /* ===== header ticker: identical logic/behaviour to the other pages ===== */
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-  let tickerNextTerritory = [];
-  let tickerOtherQueue = [];
-  let tickerRotateIdx = 0;
-  let tickerStarted = false;
-  let tickerFeedEvents = [];
-
-  function fmtCountdown(utcDate){
-    const diffMs = utcDate - new Date();
-    if(diffMs <= 0) return 'underway now';
-    const mins = Math.round(diffMs/60000);
-    const d = Math.floor(mins/1440);
-    const h = Math.floor((mins%1440)/60);
-    const m = mins%60;
-    const parts = [];
-    if(d) parts.push(d+'d');
-    if(h) parts.push(h+'h');
-    if(!d && m) parts.push(m+'m');
-    if(!parts.length) parts.push('<1m');
-    return 'in ' + parts.join(' ');
-  }
-
-  /* Sources from the same data as Game Events / Gantt View (assets/game-events-data.js
-     + events-data-game.json), instead of the retired events-data.js arc calendar. */
-  function recomputeTickerData(){
-    const now = new Date();
-    const todayISO = toZoned(now.toISOString(), 'uk-auto').dateISO;
-    const winStart = todayISO;
-    const winEnd = addDays(winStart, 14);
-
-    const territoryHits = generateRecurringEvents(TERRITORY_EVENTS, winStart, winEnd)
-      .map(ev => ({ev: {name: ev.title}, utcDate: new Date(ev.startUTC)}))
-      .filter(x => x.utcDate > now)
-      .sort((a,b) => a.utcDate - b.utcDate);
-    tickerNextTerritory = territoryHits.slice(0, 2);
-
-    const mergedFeed = buildMergedEvents(tickerFeedEvents).filter(e => e.eventSubType !== 'voyage_across_the_void');
-    const voyageOccurrences = generateRecurringEvents(VOYAGE_EVENTS, winStart, winEnd);
-    const sectorStrikeOccurrences = generateRecurringEvents(TUESDAY_EVENTS, winStart, winEnd);
-    const otherHits = [...mergedFeed, ...voyageOccurrences, ...sectorStrikeOccurrences]
-      .filter(ev => ev.startUTC && new Date(ev.startUTC) > now)
-      .filter(isNotableForTicker)
-      .map(ev => ({ev: {name: ev.title}, utcDate: new Date(ev.startUTC)}))
-      .sort((a,b) => a.utcDate - b.utcDate);
-    tickerOtherQueue = otherHits.slice(0, 10);
-    if(tickerRotateIdx >= tickerOtherQueue.length) tickerRotateIdx = 0;
-  }
-
-  function updateTickerDOM(){
-    const tcEl = document.getElementById('tcNext');
-    const tcEl2 = document.getElementById('tcThen');
-    const evEl = document.getElementById('evTicker');
-    if(!tcEl || !evEl) return;
-
-    const t0 = tickerNextTerritory[0], t1 = tickerNextTerritory[1];
-    if(t0){
-      tcEl.innerHTML = `<span class="tc-label">Next Capture</span><span class="tc-name">${escapeHtml(t0.ev.name.replace(' — Territory Capture',''))}</span><span class="tc-countdown">${fmtCountdown(t0.utcDate)}</span>`;
-    } else {
-      tcEl.innerHTML = `<span class="tc-label">Next Capture</span><span>None scheduled</span>`;
-    }
-    if(tcEl2){
-      if(t1){
-        tcEl2.innerHTML = `<span class="tc-label">Then</span><span class="tc-name">${escapeHtml(t1.ev.name.replace(' — Territory Capture',''))}</span><span class="tc-countdown">${fmtCountdown(t1.utcDate)}</span>`;
-        tcEl2.style.display = '';
-      } else {
-        tcEl2.style.display = 'none';
+async function loadPromoCodes(){
+  const container = document.getElementById('promoContainer');
+  try{
+    const rows = await sb('arc_promo_codes?select=*&order=sort_order.asc');
+    if(!rows.length){ container.innerHTML = '<div class="placeholder-note">No promo codes posted yet for this arc.</div>'; return; }
+    const groups = groupBy(rows, r => `${r.event_name}|||${r.event_date ?? ''}`);
+    let html = '';
+    for(const [key, items] of groups){
+      const [eventName, eventDate] = key.split('|||');
+      const dateStr = eventDate ? new Date(eventDate + 'T00:00:00').toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'}) : '';
+      html += `<div class="event-card">
+        <div class="event-title"><span>${escapeHtml(eventName)}</span><span class="event-date">${escapeHtml(dateStr)}</span></div>`;
+      for(const item of items){
+        html += `<div class="code-row">
+          <span class="grade-tag">${escapeHtml(item.grade_label)}</span>
+          <span class="code-val">${escapeHtml(item.code)}</span>
+          ${item.reward ? `<span class="code-reward">${escapeHtml(item.reward)}</span>` : ''}
+          ${item.notes ? `<span class="code-notes">${escapeHtml(item.notes)}</span>` : ''}
+        </div>`;
       }
+      html += `</div>`;
     }
+    container.innerHTML = html;
+  }catch(e){
+    console.error(e);
+    container.innerHTML = '<div class="placeholder-note">Could not load promo codes. Please refresh.</div>';
+  }
+}
 
-    if(tickerOtherQueue.length){
-      const cur = tickerOtherQueue[tickerRotateIdx];
-      const next = tickerOtherQueue.length > 1 ? tickerOtherQueue[(tickerRotateIdx+1) % tickerOtherQueue.length] : null;
-      let html = `${escapeHtml(cur.ev.name)} — ${fmtCountdown(cur.utcDate)}`;
-      if(next && next !== cur){
-        html += `<span class="ev-sep">·</span>${escapeHtml(next.ev.name)} — ${fmtCountdown(next.utcDate)}`;
+async function loadTrivia(){
+  const container = document.getElementById('triviaContainer');
+  try{
+    const rows = await sb('arc_trivia?select=*&order=sort_order.asc');
+    if(!rows.length){ container.innerHTML = '<div class="placeholder-note">No trivia answers posted yet for this arc.</div>'; return; }
+    const groups = groupBy(rows, r => r.event_name);
+    let html = '';
+    for(const [eventName, items] of groups){
+      html += `<div class="event-card"><div class="event-title"><span>${escapeHtml(eventName)}</span></div>`;
+      const dayGroups = groupBy(items, r => r.day_number ?? '');
+      for(const [day, dayItems] of dayGroups){
+        if(day !== ''){
+          html += `<div class="day-label">Day ${escapeHtml(day)}</div>`;
+        }
+        for(const item of dayItems){
+          html += `<div class="trivia-row">
+            <span class="trivia-part">${escapeHtml(item.label)}</span>
+            ${item.clue ? `<span class="trivia-clue">${escapeHtml(item.clue)} —</span>` : ''}
+            <span class="trivia-answer">${escapeHtml(item.answer)}</span>
+          </div>`;
+        }
       }
-      evEl.innerHTML = html;
-    } else {
-      evEl.textContent = 'Nothing else on the schedule right now';
+      html += `</div>`;
+    }
+    container.innerHTML = html;
+  }catch(e){
+    console.error(e);
+    container.innerHTML = '<div class="placeholder-note">Could not load trivia answers. Please refresh.</div>';
+  }
+}
+
+loadPromoCodes();
+loadTrivia();
+
+// --- Arc Overview & Suggested Crews galleries ---
+// To add more later: just add another object to these arrays.
+const OVERVIEW_ITEMS = [
+  {
+    title: "U.S.S. Excelsior / V'ger Challenge (placeholder example)",
+    image: "assets/arc/arc-vger-overview.png",
+    caption: "Placeholder only — not confirmed for this arc. Official STFC breakdown of the V'ger Challenge Track, Search and Destroy Daily Challenge, Excelsior's Enhance ability, and the Challenge Refinery, shown here just to preview the layout.",
+    credit: "Source: Star Trek Fleet Command"
+  }
+];
+
+const CREW_ITEMS = [
+  {
+    title: "V'ger Challenge Hostiles — Crew Sheet (placeholder example)",
+    image: "assets/arc/crews-blue-vger.jpg",
+    caption: "Placeholder only — not confirmed for this arc. Bridge/below-deck officer setups per hostile, shown here just to preview the layout.",
+    credit: "Crews by BlueMandalorian"
+  }
+];
+
+function renderGallery(containerId, items){
+  const el = document.getElementById(containerId);
+  if(!items.length){
+    el.innerHTML = '<div class="placeholder-note">Coming soon — waiting on source material.</div>';
+    return;
+  }
+  el.innerHTML = items.map((it, i) => `
+    <div class="gallery-card" data-gallery="${containerId}" data-index="${i}">
+      <img src="${it.image}" alt="${escapeHtml(it.title)}" loading="lazy">
+      <div class="gc-body">
+        <div class="gc-title">${escapeHtml(it.title)}</div>
+        <div class="gc-caption">${escapeHtml(it.caption)}</div>
+        <div class="gc-credit">${escapeHtml(it.credit)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+renderGallery('overviewGallery', OVERVIEW_ITEMS);
+renderGallery('crewsGallery', CREW_ITEMS);
+
+const galleryData = { overviewGallery: OVERVIEW_ITEMS, crewsGallery: CREW_ITEMS };
+const glightbox = document.getElementById('glightbox');
+
+function openGlightbox(item){
+  document.getElementById('glImg').src = item.image;
+  document.getElementById('glImg').alt = item.title;
+  document.getElementById('glCaption').textContent = item.caption;
+  document.getElementById('glCredit').textContent = item.credit;
+  glightbox.classList.add('open');
+  history.pushState({ glightboxOpen: true }, '');
+}
+function closeGlightbox(fromPopstate){
+  if(!glightbox.classList.contains('open')) return;
+  glightbox.classList.remove('open');
+  if(!fromPopstate){
+    // we're closing via the X or backdrop tap, not the back button —
+    // consume the history entry we pushed so back-button state stays in sync
+    if(history.state && history.state.glightboxOpen){
+      history.back();
     }
   }
-
-  function rotateTicker(){
-    const evEl = document.getElementById('evTicker');
-    if(!evEl || tickerOtherQueue.length < 3) { updateTickerDOM(); return; }
-    evEl.classList.add('fade');
-    setTimeout(() => {
-      tickerRotateIdx = (tickerRotateIdx + 1) % tickerOtherQueue.length;
-      updateTickerDOM();
-      evEl.classList.remove('fade');
-    }, 400);
+}
+document.addEventListener('click', e => {
+  const card = e.target.closest('.gallery-card');
+  if(card){
+    const items = galleryData[card.dataset.gallery];
+    openGlightbox(items[Number(card.dataset.index)]);
+    return;
   }
-
-  function startHeaderTicker(){
-    if(tickerStarted) return;
-    tickerStarted = true;
-    loadGameEventsFeed().then(({events}) => {
-      tickerFeedEvents = events;
-      recomputeTickerData();
-      updateTickerDOM();
+  if(e.target === glightbox || e.target.id === 'glClose'){
+    closeGlightbox(false);
+  }
+});
+window.addEventListener('popstate', () => {
+  closeGlightbox(true);
+});
+</script>
+<script>
+(function(){
+  try{
+    fetch('https://mmzizgsanwqjpiumpqay.supabase.co/rest/v1/page_views', {
+      method: 'POST',
+      headers: {
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1teml6Z3NhbndxanBpdW1wcWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjk5MzksImV4cCI6MjEwMTYwNTkzOX0.KqvY2Ib33J8h8ztEi8qxtfutSdVIPAaJRtj7cSUSKFM',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        site: 'phoenix-tracker',
+        path: location.pathname,
+        referrer: document.referrer || null
+      })
     });
-    setInterval(rotateTicker, 5500);
-    setInterval(() => {
-      loadGameEventsFeed().then(({events}) => {
-        tickerFeedEvents = events;
-        recomputeTickerData();
-        updateTickerDOM();
-      });
-    }, 60000);
+  }catch(e){}
+})();
+</script>
+
+<script>
+(function(){
+  const SUPABASE_URL = 'https://mmzizgsanwqjpiumpqay.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1teml6Z3NhbndxanBpdW1wcWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjk5MzksImV4cCI6MjEwMTYwNTkzOX0.KqvY2Ib33J8h8ztEi8qxtfutSdVIPAaJRtj7cSUSKFM';
+
+  async function sb(path){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    });
+    if(!res.ok) throw new Error('fetch failed ' + res.status);
+    return res.json();
   }
 
-  startHeaderTicker(); // independent of Supabase/login state — runs off assets/game-events-data.js + events-data-game.json
+  function escapeHtmlHero(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function gradeForLevelHero(level){
+    level = Number(level);
+    if(level <= 20) return 'G1';
+    return 'G' + (Math.floor((level - 21) / 10) + 2);
+  }
+
+  async function loadHeroes(){
+    const el = document.getElementById('heroTicker');
+    if(!el) return;
+    try{
+      const [scores, roster, eventsList] = await Promise.all([
+        sb('scores?select=player_id,score,event_id'),
+        sb('roster?select=id,name,status,level'),
+        sb('events?select=id,is_test')
+      ]);
+      const nameMap = {};
+      roster.forEach(r => { nameMap[r.id] = r; });
+      const testEventIds = new Set(eventsList.filter(e => e.is_test).map(e => e.id));
+      const totals = {};
+      scores.forEach(s => {
+        if(testEventIds.has(s.event_id)) return; // never count test/demo events
+        totals[s.player_id] = (totals[s.player_id] || 0) + Number(s.score || 0);
+      });
+      const list = Object.keys(totals)
+        .map(id => ({
+          id,
+          name: nameMap[id] ? nameMap[id].name : id,
+          status: nameMap[id] ? nameMap[id].status : 'active',
+          grade: nameMap[id] ? gradeForLevelHero(nameMap[id].level) : null,
+          total: totals[id]
+        }))
+        .filter(x => x.status === 'active' && x.grade && x.total > 0); // zero-scorers never shown, no padding
+
+      if(!list.length){ el.innerHTML = ''; return; }
+
+      const byGrade = {};
+      list.forEach(x => { (byGrade[x.grade] = byGrade[x.grade] || []).push(x); });
+      const grades = Object.keys(byGrade).sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+
+      let segments = '';
+      let entryCount = 0;
+      grades.forEach(g => {
+        const top5 = byGrade[g].sort((a, b) => b.total - a.total).slice(0, 5); // fewer than 5 real scorers = fewer entries, never padded
+        if(!top5.length) return;
+        const items = top5.map((h, i) => `<span class="hname">#${i+1} ${escapeHtmlHero(h.name)}</span> <span class="hscore">${h.total.toLocaleString()} pts</span>`).join('&nbsp;&nbsp;\u00b7&nbsp;&nbsp;');
+        segments += `<span class="hgrouphead">${g}</span>&nbsp;&nbsp;${items}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`;
+        entryCount += top5.length;
+      });
+
+      const duration = Math.max(18, entryCount * 3);
+      el.innerHTML = `<div class="htrack" style="animation-duration:${duration}s;">${segments}${segments}</div>`;
+    }catch(e){
+      console.error(e);
+      el.innerHTML = '';
+    }
+  }
+  loadHeroes();
+})();
 </script>
 </body>
 </html>
