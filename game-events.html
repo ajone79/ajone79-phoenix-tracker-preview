@@ -456,10 +456,13 @@ function render(){
 
   const byDay = {};
 
-  // Fixed window: today (in the selected timezone) through +30 days.
-  // No manual date-range picker — kept simple and consistent with Gantt View.
-  const winStart = toZoned(new Date().toISOString(), tzValue).dateISO;
-  const winEnd = addDays(winStart, DEFAULT_WINDOW_DAYS);
+  // Window: 3 days back (so recently-finished events, and anything that started
+  // the day before and ran past midnight, are still reachable by scrolling up)
+  // through today, through +30 days forward. No manual date-range picker.
+  const LOOKBACK_DAYS = 3;
+  const trueTodayISO = toZoned(new Date().toISOString(), tzValue).dateISO;
+  const winStart = addDays(trueTodayISO, -LOOKBACK_DAYS);
+  const winEnd = addDays(trueTodayISO, DEFAULT_WINDOW_DAYS);
 
   // One combined candidate list: scraped+merged feed events (minus Voyage,
   // which is hand-defined below instead) + recurring Territory Capture +
@@ -477,9 +480,6 @@ function render(){
     if(!activeTypes.has(ev.displayType)) return;
     if(!ticketedVisible && ev.eventSubType === 'ticketed') return;
     if(search && !ev.title.toLowerCase().includes(search)) return;
-    // Past events are always hidden (baked-in default, previously a checkbox)
-    if(ev.endUTC && new Date(ev.endUTC).getTime() < nowMs) return;
-    if(!ev.endUTC && ev.startUTC && new Date(ev.startUTC).getTime() < nowMs) return;
 
     const opsMin = ev.minOpsLevel == null ? 1 : ev.minOpsLevel;
     const opsMax = ev.maxOpsLevel == null ? 999 : ev.maxOpsLevel;
@@ -490,27 +490,18 @@ function render(){
 
     if(!ev.startUTC) return;
     const startZ = toZoned(ev.startUTC, tzValue);
-    if(startZ.dateISO > winEnd) return;
-    // An event that started before today but hasn't ended yet (checked above) is still
-    // currently running — show it under TODAY instead of dropping it just because it
-    // technically started "in the past". Its own startZ/timeLabel still show the real
-    // start time, so it's clear it began the day before.
-    const carriedOver = startZ.dateISO < winStart;
-    const bucketDateISO = carriedOver ? winStart : startZ.dateISO;
-    if(bucketDateISO < winStart) return;
+    // The lookback window itself is what limits how much history shows — no separate
+    // "hide already-ended events" check, since showing recently-finished events on the
+    // days you can scroll back to is the whole point.
+    if(startZ.dateISO < winStart || startZ.dateISO > winEnd) return;
 
     const endZ = ev.endUTC ? toZoned(ev.endUTC, tzValue) : null;
-    (byDay[bucketDateISO] = byDay[bucketDateISO] || []).push({ev, startZ, endZ, opsMin, opsMax, carriedOver});
+    (byDay[startZ.dateISO] = byDay[startZ.dateISO] || []).push({ev, startZ, endZ, opsMin, opsMax});
   });
 
-  // Currently-running carried-over events float to the top of today's list,
-  // ahead of events sorted by their time-of-day start.
-  Object.values(byDay).forEach(list => list.sort((a,b) => {
-    if(a.carriedOver !== b.carriedOver) return a.carriedOver ? -1 : 1;
-    return a.startZ.h*60+a.startZ.m - (b.startZ.h*60+b.startZ.m);
-  }));
+  Object.values(byDay).forEach(list => list.sort((a,b) => a.startZ.h*60+a.startZ.m - (b.startZ.h*60+b.startZ.m)));
 
-  const todayISO = winStart;
+  const todayISO = trueTodayISO;
   const daysToShow = dateRangeList(winStart, winEnd);
   const dayList = el('dayList');
   dayList.innerHTML = '';
@@ -552,16 +543,14 @@ function render(){
       empty.textContent = 'No matching events for this day.';
       card.appendChild(empty);
     } else {
-      list.forEach(({ev, startZ, endZ, opsMin, opsMax, carriedOver}) => {
+      list.forEach(({ev, startZ, endZ, opsMin, opsMax}) => {
         const catDef = GAME_CATS[ev.displayType] || GAME_CATS[''];
         const row = document.createElement('div');
         row.className = 'event-row';
         const opsLabel = opsMax>=999 ? (opsMin+'+') : (opsMin+'–'+opsMax);
-        const timeLabel = carriedOver
-          ? 'Started ' + dateLabelShort(startZ.dateISO) + ' ' + fmtTime(startZ.h, startZ.m) + ' → ' + (endZ ? fmtTime(endZ.h, endZ.m) : 'ongoing')
-          : (endZ
-            ? fmtTime(startZ.h, startZ.m) + ' → ' + (endZ.dateISO !== startZ.dateISO ? dateLabelShort(endZ.dateISO)+' ' : '') + fmtTime(endZ.h, endZ.m)
-            : fmtTime(startZ.h, startZ.m));
+        const timeLabel = endZ
+          ? fmtTime(startZ.h, startZ.m) + ' → ' + (endZ.dateISO !== startZ.dateISO ? dateLabelShort(endZ.dateISO)+' ' : '') + fmtTime(endZ.h, endZ.m)
+          : fmtTime(startZ.h, startZ.m);
         const fullDesc = ev.description || '';
         const isLong = fullDesc.length > DESC_TRUNCATE_LEN;
         const shortDesc = isLong ? truncate(fullDesc, DESC_TRUNCATE_LEN) : fullDesc;
@@ -574,7 +563,6 @@ function render(){
               ((ev.formats&&ev.formats.length)?'<span class="tag">'+ev.formats.join(' · ')+'</span>':'')+
               (ev.eventSubType==='heroic'?'<span class="tag heroic">Heroic</span>':'')+
               (ev.eventSubType==='ticketed'?'<span class="tag ticketed">Ticketed</span>':'')+
-              (carriedOver?'<span class="tag" style="color:#5fd068;border-color:#5fd068;">Live now</span>':'')+
               (ev.priority==='incursion'?'<span class="tag incursion">Incursion</span>':'')+
             '</div>'+
             '<div class="ev-meta"><span>'+timeLabel+'</span><span>Ops '+opsLabel+'</span></div>'+
