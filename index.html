@@ -187,6 +187,8 @@
   .discord-channel{ font-size:9.5px; color:var(--amber); background:rgba(242,169,59,.1); border:1px solid var(--amber-dim); border-radius:20px; padding:1px 8px; }
   .discord-time{ font-size:10.5px; color:var(--muted); margin-left:auto; }
   .discord-content{ font-size:13px; color:var(--text); line-height:1.5; margin-top:2px; white-space:pre-line; word-break:break-word; }
+  .discord-images{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .discord-images img{ max-width:180px; max-height:140px; border-radius:8px; border:1px solid var(--line); cursor:pointer; object-fit:cover; }
   .discord-link{ font-size:10.5px; color:var(--teal); text-decoration:none; }
   .placeholder-note{
     color:var(--muted); font-size:13px; text-align:center;
@@ -647,7 +649,8 @@ function renderDiscordList(rows){
           ${m.channel_label ? `<span class="discord-channel">${escapeHtml(m.channel_label)}</span>` : ''}
           <span class="discord-time">${relativeTime(m.posted_at)}</span>
         </div>
-        <div class="discord-content">${escapeHtml(m.content)}</div>
+        ${m.content ? `<div class="discord-content">${escapeHtml(m.content)}</div>` : ''}
+        ${(m.image_urls && m.image_urls.length) ? `<div class="discord-images">${m.image_urls.map(u => `<img src="${escapeHtml(u)}" alt="" loading="lazy" data-fullimg="${escapeHtml(u)}">`).join('')}</div>` : ''}
         <a class="discord-link" href="${escapeHtml(m.message_url)}" target="_blank" rel="noopener noreferrer">View on Discord ↗</a>
       </div>
     </div>
@@ -680,15 +683,25 @@ async function loadDiscordAnnouncements(){
     document.getElementById('discordNewDot').style.display = hasNew ? 'inline-block' : 'none';
 
     const latest = rows[0];
+    const hasImages = latest.image_urls && latest.image_urls.length;
+    const previewText = latest.content
+      ? truncate1Line(latest.content, 70) + (hasImages ? ' 🖼️' : '')
+      : (hasImages ? `🖼️ ${latest.image_urls.length > 1 ? latest.image_urls.length + ' images' : 'Image'}` : '');
     preview.innerHTML = `
       <div class="discord-preview" id="discordPreviewRow">
         <span class="discord-preview-author">${escapeHtml(latest.author_name)}:</span>
-        <span class="discord-preview-text">${escapeHtml(truncate1Line(latest.content, 70))}</span>
+        <span class="discord-preview-text">${escapeHtml(previewText)}</span>
         <span class="discord-expand-hint" id="discordExpandHint">▾ Expand</span>
       </div>
     `;
     list.innerHTML = renderDiscordList(rows);
     document.getElementById('discordPreviewRow').addEventListener('click', () => toggleDiscordExpanded(rows));
+    list.querySelectorAll('[data-fullimg]').forEach(img => {
+      img.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openGlightbox({ image: img.dataset.fullimg, title: 'Discord image', caption: '', credit: '' });
+      });
+    });
   }catch(e){
     console.error('loadDiscordAnnouncements failed', e);
     preview.innerHTML = '<div class="placeholder-note">Could not load announcements. Please refresh.</div>';
