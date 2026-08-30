@@ -55,6 +55,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const params = new URLSearchParams(location.search);
 const next = params.get('next') || 'index.html';
+const invite = params.get('invite') || '';
 
 function showErr(msg){
   const e = document.getElementById('err');
@@ -69,10 +70,25 @@ function showOk(msg){
   document.getElementById('err').style.display = 'none';
 }
 
+if(invite){
+  const p = document.querySelector('.box p');
+  if(p) p.innerHTML = '<b style="color:#5fd068;">You have an invite link — your access will be approved automatically once you sign in, no need to wait for an officer.</b><br><br>' + p.innerHTML;
+}
+
+// Both sign-in methods bounce back through THIS page (with next/invite preserved),
+// rather than straight to the destination, so the invite can be redeemed here in
+// one place before finally forwarding the person on.
+function buildRedirect(){
+  const back = new URLSearchParams();
+  back.set('next', next);
+  if(invite) back.set('invite', invite);
+  return location.origin + '/login.html?' + back.toString();
+}
+
 document.getElementById('discordBtn').addEventListener('click', async ()=>{
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'discord',
-    options: { redirectTo: location.origin + '/' + next.replace(/^\//,'') }
+    options: { redirectTo: buildRedirect() }
   });
   if (error) showErr(error.message);
 });
@@ -85,7 +101,7 @@ document.getElementById('emailBtn').addEventListener('click', async ()=>{
   btn.textContent = 'Sending…';
   const { error } = await sb.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: location.origin + '/' + next.replace(/^\//,'') }
+    options: { emailRedirectTo: buildRedirect() }
   });
   btn.disabled = false;
   btn.textContent = 'Send link';
@@ -93,9 +109,16 @@ document.getElementById('emailBtn').addEventListener('click', async ()=>{
   showOk('Check your email — click the link we sent to sign in. (It can take a minute or two, and is worth checking spam.)');
 });
 
-// if already logged in, bounce straight through
-sb.auth.getSession().then(({data:{session}}) => {
-  if (session) location.href = next;
+// Once signed in (whether just now via redirect, or already had a session), redeem
+// any invite token before forwarding on — a bad/expired/used-up token just means
+// they fall back to needing normal officer approval, it never blocks sign-in itself.
+sb.auth.getSession().then(async ({data:{session}}) => {
+  if (!session) return;
+  if (invite){
+    try{ await sb.rpc('redeem_invite_token', { p_token: invite }); }
+    catch(e){ console.error('Invite redemption failed', e); }
+  }
+  location.href = next;
 });
 </script>
 </body>
