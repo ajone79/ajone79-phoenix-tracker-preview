@@ -154,6 +154,22 @@
   .trivia-clue{ color:var(--text); font-weight:600; }
   .trivia-answer{ color:var(--teal); }
 
+  .sched-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:12px; }
+  .sched-table{ width:100%; min-width:760px; border-collapse:collapse; font-size:12.5px; }
+  .sched-table th{ background:var(--panel-2); color:var(--amber); font-family:'Orbitron',sans-serif; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .sched-table td{ padding:10px 12px; border-bottom:1px solid var(--line); border-right:1px solid var(--line); vertical-align:top; min-width:150px; }
+  .sched-table td:last-child, .sched-table th:last-child{ border-right:none; }
+  .sched-row-label{ background:var(--panel-2); color:var(--teal); font-weight:700; white-space:nowrap; position:sticky; left:0; }
+  .sched-cell-text{ color:var(--text); line-height:1.4; }
+  .sched-hint-btn{ all:unset; display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-size:10.5px; color:var(--amber); cursor:pointer; padding:2px 8px; border:1px solid var(--amber-dim); border-radius:20px; }
+  .sched-hint-btn:hover{ background:rgba(242,169,59,.1); }
+  .hint-modal{ position:fixed; inset:0; z-index:71; background:rgba(4,6,12,.82); display:none; align-items:center; justify-content:center; padding:20px; }
+  .hint-modal.open{ display:flex; }
+  .hint-modal-box{ background:var(--panel); border:1px solid var(--amber-dim); border-radius:14px; padding:20px 22px; max-width:440px; position:relative; }
+  .hint-modal-box h4{ margin:0 0 10px; color:var(--amber); font-size:13px; text-transform:uppercase; letter-spacing:.05em; }
+  .hint-modal-box p{ margin:0; color:var(--text); font-size:13.5px; line-height:1.6; white-space:pre-line; }
+  .hint-modal-close{ position:absolute; top:12px; right:14px; color:var(--muted); font-size:20px; cursor:pointer; line-height:1; }
+  .hint-modal-close:hover{ color:var(--text); }
   .placeholder-note{
     color:var(--muted); font-size:13px; text-align:center;
     padding:26px 10px; border:1px dashed var(--line); border-radius:8px;
@@ -276,6 +292,7 @@
   </div>
 
   <div class="quick-nav">
+    <a href="#weekly">Weekly Events</a>
     <a href="#overview">Arc Overview</a>
     <a href="#crews">Suggested Crews</a>
     <a href="#promo">Promo Codes</a>
@@ -283,6 +300,12 @@
   </div>
 
   <div class="wip-banner" id="wipBanner" style="display:none;"></div>
+
+  <section class="block" id="weekly">
+    <h2>Weekly Events</h2>
+    <div class="block-sub">What to focus on each day, independent of the current arc. Tap the hint icon on a day for extra tips.</div>
+    <div class="sched-wrap"><table class="sched-table" id="schedTable"></table></div>
+  </section>
 
   <section class="block" id="overview">
     <h2>Arc Overview</h2>
@@ -312,6 +335,14 @@
     <div id="triviaContainer"><div class="placeholder-note">Loading…</div></div>
   </section>
 </main>
+
+<div class="hint-modal" id="hintModal">
+  <div class="hint-modal-box">
+    <span class="hint-modal-close" id="hintModalClose">✕</span>
+    <h4 id="hintModalTitle">Hint</h4>
+    <p id="hintModalText"></p>
+  </div>
+</div>
 
 <div class="glightbox" id="glightbox">
   <div class="gl-close" id="glClose">✕</div>
@@ -498,6 +529,65 @@ async function loadGalleries(){
 
 loadHomeContent();
 loadGalleries();
+
+/* ---------------- Weekly Events schedule ---------------- */
+const DAY_LABELS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+function openHintModal(rowLabel, dayLabel, hintText){
+  document.getElementById('hintModalTitle').textContent = rowLabel + ' — ' + dayLabel;
+  document.getElementById('hintModalText').textContent = hintText;
+  document.getElementById('hintModal').classList.add('open');
+}
+function closeHintModal(){
+  document.getElementById('hintModal').classList.remove('open');
+}
+document.getElementById('hintModalClose').addEventListener('click', closeHintModal);
+document.getElementById('hintModal').addEventListener('click', (e) => {
+  if(e.target.id === 'hintModal') closeHintModal();
+});
+
+async function loadSchedule(){
+  const table = document.getElementById('schedTable');
+  try{
+    const [rows, cells] = await Promise.all([
+      sb('home_schedule_rows?select=*&order=sort_order.asc'),
+      sb('home_schedule_cells?select=*')
+    ]);
+    if(!rows.length){
+      table.parentElement.innerHTML = '<div class="placeholder-note">No weekly events set up yet.</div>';
+      return;
+    }
+    const cellsByRow = {};
+    cells.forEach(c => {
+      (cellsByRow[c.row_id] = cellsByRow[c.row_id] || {})[c.day_of_week] = c;
+    });
+
+    let html = '<thead><tr><th>Event</th>' + DAY_LABELS.map(d => `<th>${d}</th>`).join('') + '</tr></thead><tbody>';
+    rows.forEach(row => {
+      html += `<tr><td class="sched-row-label">${escapeHtml(row.label)}</td>`;
+      for(let d = 0; d < 7; d++){
+        const cell = (cellsByRow[row.id] || {})[d];
+        const text = cell ? cell.cell_text : '';
+        const hint = cell ? cell.hint_text : '';
+        html += `<td>
+          ${text ? `<div class="sched-cell-text">${escapeHtml(text)}</div>` : '<div class="sched-cell-text" style="color:var(--muted);">—</div>'}
+          ${hint ? `<button type="button" class="sched-hint-btn" data-row="${escapeHtml(row.label)}" data-day="${DAY_LABELS[d]}" data-hint="${escapeHtml(hint)}">💡 Hint</button>` : ''}
+        </td>`;
+      }
+      html += '</tr>';
+    });
+    html += '</tbody>';
+    table.innerHTML = html;
+
+    table.querySelectorAll('.sched-hint-btn').forEach(btn => {
+      btn.addEventListener('click', () => openHintModal(btn.dataset.row, btn.dataset.day, btn.dataset.hint));
+    });
+  }catch(e){
+    console.error('loadSchedule failed', e);
+    table.parentElement.innerHTML = '<div class="placeholder-note">Could not load the weekly schedule. Please refresh.</div>';
+  }
+}
+loadSchedule();
 
 const glightbox = document.getElementById('glightbox');
 
