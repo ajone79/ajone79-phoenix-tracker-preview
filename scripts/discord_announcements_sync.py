@@ -64,14 +64,29 @@ def main():
         rows = []
         for m in messages:
             content = m.get("content") or ""
-            # Skip genuinely empty messages (e.g. pure attachment/embed with no text)
-            # unless it has an embed title/description worth surfacing.
-            if not content and not m.get("embeds") and not m.get("attachments"):
+
+            # Pull out image attachments/embeds separately so they can be shown as
+            # actual thumbnails rather than being dropped or reduced to a filename.
+            image_urls = []
+            for a in m.get("attachments", []):
+                content_type = (a.get("content_type") or "")
+                filename = (a.get("filename") or "").lower()
+                is_image = content_type.startswith("image/") or filename.endswith((".png", ".jpg", ".jpeg", ".gif", ".webp"))
+                if is_image and a.get("url"):
+                    image_urls.append(a["url"])
+            for e in m.get("embeds", []):
+                img = e.get("image") or e.get("thumbnail")
+                if img and img.get("url"):
+                    image_urls.append(img["url"])
+
+            # Skip genuinely empty messages (no text, no image, no embed worth surfacing)
+            if not content and not image_urls and not m.get("embeds"):
                 continue
             if not content and m.get("embeds"):
                 embed = m["embeds"][0]
-                content = embed.get("title") or embed.get("description") or "[embed]"
-            if not content and m.get("attachments"):
+                content = embed.get("title") or embed.get("description") or ""
+            if not content and not image_urls and m.get("attachments"):
+                # Non-image attachment (e.g. a file) with no caption text
                 content = "[attachment] " + ", ".join(a.get("filename", "") for a in m["attachments"])
 
             author = m.get("author", {})
@@ -86,6 +101,7 @@ def main():
                 "author_name": author.get("global_name") or author.get("username") or "Unknown",
                 "author_avatar_url": avatar_url,
                 "content": content[:2000],
+                "image_urls": image_urls,
                 "message_url": f"https://discord.com/channels/{GUILD_ID}/{ch['id']}/{m['id']}",
                 "posted_at": m["timestamp"],
             })
