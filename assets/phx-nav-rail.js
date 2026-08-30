@@ -1,8 +1,8 @@
 (function(){
   const PRIMARY = [
-    {href:'/index.html', label:'Home', icon:'🏠'},
-    {href:'/alb-participation.html', label:'ALB Part.', icon:'📊'},
-    {href:'/game-events.html', label:'Events', icon:'🗓️'},
+    {href:'/index.html', label:'Home', icon:'🪐'},
+    {href:'/alb-participation.html', label:'ALB Part.', icon:'📡'},
+    {href:'/game-events.html', label:'Events', icon:'🛰️'},
     {href:'/f2p-task-guide.html', label:'F2P', icon:'🎯'},
     {href:'/crewing.html', label:'Crewing', icon:'🖖'},
   ];
@@ -87,13 +87,13 @@
     rail.id = 'phx-rail';
     rail.innerHTML = `<div class="pr-logo">PHX</div>` +
       PRIMARY.map(p => `<a href="${p.href}" class="${isCurrent(p.href)?'current':''}"><span class="pr-ic">${p.icon}</span><span class="pr-lbl">${p.label}</span></a>`).join('') +
-      `<button type="button" id="phx-rail-more"><span class="pr-ic">⋯</span><span class="pr-lbl">More</span></button>`;
+      `<button type="button" id="phx-rail-more"><span class="pr-ic">⚙️</span><span class="pr-lbl">More</span></button>`;
     document.body.prepend(rail);
 
     const bottom = document.createElement('div');
     bottom.id = 'phx-bottom';
     bottom.innerHTML = PRIMARY.map(p => `<a href="${p.href}" class="${isCurrent(p.href)?'current':''}"><span class="pb-ic">${p.icon}</span><span class="pb-lbl">${p.label}</span></a>`).join('') +
-      `<button type="button" id="phx-bottom-more"><span class="pb-ic">⋯</span><span class="pb-lbl">More</span></button>`;
+      `<button type="button" id="phx-bottom-more"><span class="pb-ic">⚙️</span><span class="pb-lbl">More</span></button>`;
     document.body.appendChild(bottom);
 
     document.body.classList.add('phx-has-rail');
