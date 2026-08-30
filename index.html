@@ -249,6 +249,7 @@
   <section class="block" id="overview">
     <h2>Arc Overview</h2>
     <div class="block-sub">What this arc is about, key mechanics, and timeline. Tap a card to view full size.</div>
+    <iframe id="patchNotesFrame" src="arc-content/m94-1-patch-notes.html" title="M94.1 Cause & Effect Mid Arc Patch Notes" loading="lazy" style="width:100%;border:0;border-radius:16px;display:block;margin-bottom:16px;min-height:400px;"></iframe>
     <div class="gallery" id="overviewGallery"></div>
   </section>
 
@@ -370,6 +371,16 @@ async function loadTrivia(){
 
 loadPromoCodes();
 loadTrivia();
+
+(function(){
+  const f = document.getElementById('patchNotesFrame');
+  if(!f) return;
+  function resize(){
+    try{ f.style.height = f.contentWindow.document.documentElement.scrollHeight + 'px'; }catch(e){}
+  }
+  f.addEventListener('load', () => { resize(); setTimeout(resize, 350); });
+  window.addEventListener('resize', resize);
+})();
 
 // --- Arc Overview & Suggested Crews galleries ---
 // To add more later: just add another object to these arrays.
