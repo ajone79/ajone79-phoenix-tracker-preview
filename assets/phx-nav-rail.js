@@ -35,6 +35,9 @@
       #phx-more-panel.open{display:flex;}
       #phx-more-sheet{background:#111116;border:1px solid #23232b;border-top-left-radius:16px;border-top-right-radius:16px;width:100%;max-width:480px;padding:10px 10px 20px;max-height:70vh;overflow-y:auto;}
       #phx-more-sheet .pm-handle{width:36px;height:4px;background:#39394a;border-radius:3px;margin:6px auto 12px;}
+      #phx-more-identity{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #23232b;margin-bottom:6px;}
+      #phx-more-identity .pi-name{font-size:11.5px;color:#9a9aa4;font-family:'Rajdhani','Space Mono',sans-serif;}
+      #phx-more-identity .pi-signout{font-size:11px;color:#f2a93b;text-decoration:none;background:none;border:none;cursor:pointer;font-family:'Rajdhani','Space Mono',sans-serif;}
       #phx-more-sheet a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;color:#e8e6e1;text-decoration:none;}
       #phx-more-sheet a:hover{background:rgba(255,255,255,.06);}
       #phx-more-sheet .pm-ic{font-size:19px;width:24px;text-align:center;flex-shrink:0;}
@@ -67,20 +70,34 @@
         `<a href="${m.href}"><span class="pm-ic">${m.icon}</span><span><span class="pm-t">${m.label}</span><br><span class="pm-d">${m.desc}</span></span></a>`
       ).join('');
     }
+    function identityHtml(){
+      if(!profile) return '';
+      const name = profile.discord_username || profile.in_game_name || 'Signed in';
+      return `<div id="phx-more-identity"><span class="pi-name">${name}</span><button type="button" class="pi-signout" id="phx-signout">Sign out</button></div>`;
+    }
+    function wireIdentity(){
+      const btn = document.getElementById('phx-signout');
+      if(!btn) return;
+      btn.addEventListener('click', async () => {
+        if(window.__trackerSb) await window.__trackerSb.auth.signOut();
+        location.href = '/login.html';
+      });
+    }
 
     let panel = null;
     function buildMorePanel(){
       if(panel) return panel;
       panel = document.createElement('div');
       panel.id = 'phx-more-panel';
-      panel.innerHTML = `<div id="phx-more-sheet"><div class="pm-handle"></div>${moreItemsHtml()}</div>`;
+      panel.innerHTML = `<div id="phx-more-sheet"><div class="pm-handle"></div>${identityHtml()}${moreItemsHtml()}</div>`;
       panel.addEventListener('click', e=>{ if(e.target === panel) panel.classList.remove('open'); });
       document.body.appendChild(panel);
+      wireIdentity();
       return panel;
     }
     function refreshMorePanel(){
       const sheet = document.getElementById('phx-more-sheet');
-      if(sheet) sheet.innerHTML = `<div class="pm-handle"></div>${moreItemsHtml()}`;
+      if(sheet){ sheet.innerHTML = `<div class="pm-handle"></div>${identityHtml()}${moreItemsHtml()}`; wireIdentity(); }
     }
     function toggleMore(){ buildMorePanel().classList.toggle('open'); }
 
