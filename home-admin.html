@@ -52,6 +52,11 @@
   .editor-row .who{flex:1;font-size:12.5px;}
   .editor-row .who .sub{font-size:10px;color:var(--text-faint);}
   .owner-badge{font-size:9px;background:rgba(255,200,87,.15);color:var(--gold);padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+  .sched-day-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px;}
+  .sched-day-box{background:var(--panel);border:1px solid var(--hair);border-radius:8px;padding:10px;}
+  .sched-day-box label{font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px;}
+  .sched-day-box textarea{min-height:44px;font-size:11.5px;}
+  .sched-day-box input[type=text]{font-size:11.5px;margin-bottom:6px;}
 </style>
 </head>
 <body>
@@ -83,6 +88,8 @@ let galleryItems = [];
 let promoCodes = [];
 let trivia = [];
 let profiles = [];
+let scheduleRows = [];
+let scheduleCells = [];
 
 async function init(){
   const { data: { session } } = await sb.auth.getSession();
@@ -104,6 +111,8 @@ async function loadAll(){
     sb.from('home_gallery_items').select('*').order('gallery').order('sort_order'),
     sb.from('arc_promo_codes').select('*').order('sort_order'),
     sb.from('arc_trivia').select('*').order('sort_order'),
+    sb.from('home_schedule_rows').select('*').order('sort_order'),
+    sb.from('home_schedule_cells').select('*'),
   ];
   if (me.is_owner) {
     tasks.push(sb.from('tracker_profiles').select('*').eq('approved', true).order('in_game_name'));
@@ -113,7 +122,9 @@ async function loadAll(){
   galleryItems = results[1].data || [];
   promoCodes = results[2].data || [];
   trivia = results[3].data || [];
-  if (me.is_owner) profiles = results[4].data || [];
+  scheduleRows = results[4].data || [];
+  scheduleCells = results[5].data || [];
+  if (me.is_owner) profiles = results[6].data || [];
 }
 
 function flashSaved(btn, label){
@@ -489,6 +500,105 @@ function wireTriviaSection(){
   });
 }
 
+/* ---------------- Weekly Events schedule ---------------- */
+const SCHED_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+function scheduleRowCardHtml(row){
+  const cellsByDay = {};
+  scheduleCells.filter(c => c.row_id === row.id).forEach(c => { cellsByDay[c.day_of_week] = c; });
+  const dayBoxes = SCHED_DAYS.map((label, d) => {
+    const cell = cellsByDay[d] || { cell_text: '', hint_text: '' };
+    return `
+      <div class="sched-day-box">
+        <label>${label}</label>
+        <input type="text" data-sday="${d}" data-sfield="cell_text" value="${escapeHtml(cell.cell_text)}" placeholder="What to do">
+        <textarea data-sday="${d}" data-sfield="hint_text" placeholder="Optional hint (tap-to-reveal on the home screen)">${escapeHtml(cell.hint_text)}</textarea>
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="item-card" data-rowid="${row.id}">
+      <div class="item-card-head"><span class="tag">#${row.sort_order}</span><button class="btn del" data-delschedrow="${row.id}">Delete Row</button></div>
+      <div class="field-row">
+        <div class="field"><label>Row label</label><input type="text" data-srowfield="label" value="${escapeHtml(row.label)}"></div>
+        <div class="field narrow"><label>Sort order</label><input type="number" data-srowfield="sort_order" value="${row.sort_order}"></div>
+      </div>
+      <div class="sched-day-grid">${dayBoxes}</div>
+      <button class="btn save" data-savesched="${row.id}" style="margin-top:10px;">Save Row</button>
+      <span class="save-status" data-schedstatus="${row.id}"></span>
+    </div>
+  `;
+}
+
+function scheduleSectionHtml(){
+  return `
+    <h2>Weekly Events</h2>
+    <div class="h2-sub">Independent of the current arc — shown as a day-by-day table on the home screen. Add a row for each recurring event; leave a day blank if nothing applies. Hints only show as a tap-to-reveal icon, so keep the main text short.</div>
+    ${scheduleRows.length ? scheduleRows.map(scheduleRowCardHtml).join('') : '<div class="empty">No weekly events yet.</div>'}
+    <div class="panel">
+      <button class="btn add" id="addScheduleRow">Add New Row</button>
+    </div>
+  `;
+}
+
+function wireScheduleSection(){
+  document.querySelectorAll('[data-savesched]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const rowId = parseInt(e.target.dataset.savesched);
+      const card = e.target.closest('.item-card');
+      const rowPayload = {
+        label: card.querySelector('[data-srowfield=label]').value.trim(),
+        sort_order: parseInt(card.querySelector('[data-srowfield=sort_order]').value) || 0,
+      };
+      const { error: rowErr } = await sb.from('home_schedule_rows').update(rowPayload).eq('id', rowId);
+      if (rowErr) { alert('Save failed: ' + rowErr.message); return; }
+
+      const cellPayloads = [];
+      for(let d = 0; d < 7; d++){
+        cellPayloads.push({
+          row_id: rowId,
+          day_of_week: d,
+          cell_text: card.querySelector(`[data-sday="${d}"][data-sfield=cell_text]`).value.trim(),
+          hint_text: card.querySelector(`[data-sday="${d}"][data-sfield=hint_text]`).value.trim(),
+        });
+      }
+      const { data: savedCells, error: cellErr } = await sb.from('home_schedule_cells')
+        .upsert(cellPayloads, { onConflict: 'row_id,day_of_week' }).select();
+      if (cellErr) { alert('Save failed: ' + cellErr.message); return; }
+
+      const rowIdx = scheduleRows.findIndex(r => r.id === rowId);
+      if (rowIdx > -1) scheduleRows[rowIdx] = { ...scheduleRows[rowIdx], ...rowPayload };
+      scheduleCells = scheduleCells.filter(c => c.row_id !== rowId).concat(savedCells || []);
+      flashSaved(e.target, 'Saved ✓');
+    });
+  });
+  document.querySelectorAll('[data-delschedrow]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const rowId = parseInt(e.target.dataset.delschedrow);
+      if (!confirm('Delete this whole row and all its days?')) return;
+      const { error } = await sb.from('home_schedule_rows').delete().eq('id', rowId);
+      if (error) { alert('Delete failed: ' + error.message); return; }
+      scheduleRows = scheduleRows.filter(r => r.id !== rowId);
+      scheduleCells = scheduleCells.filter(c => c.row_id !== rowId);
+      render();
+    });
+  });
+  const addBtn = document.getElementById('addScheduleRow');
+  if (addBtn) addBtn.addEventListener('click', async () => {
+    const { data: newRow, error } = await sb.from('home_schedule_rows')
+      .insert({ label: 'New Event', sort_order: scheduleRows.length })
+      .select().single();
+    if (error) { alert('Add failed: ' + error.message); return; }
+    const blankCells = [];
+    for(let d = 0; d < 7; d++) blankCells.push({ row_id: newRow.id, day_of_week: d, cell_text: '', hint_text: '' });
+    const { data: newCells, error: cellErr } = await sb.from('home_schedule_cells').insert(blankCells).select();
+    if (cellErr) { alert('Add failed: ' + cellErr.message); return; }
+    scheduleRows.push(newRow);
+    scheduleCells = scheduleCells.concat(newCells);
+    render();
+  });
+}
+
 /* ---------------- Home editors (owner only) ---------------- */
 function editorsSectionHtml(){
   if (!me.is_owner) return '';
@@ -545,6 +655,7 @@ function render(){
       ${gallerySectionHtml('crews', 'Suggested Crews Gallery', 'Cards shown in the Suggested Crews block on the home screen.')}
       ${promoSectionHtml()}
       ${triviaSectionHtml()}
+      ${scheduleSectionHtml()}
       ${editorsSectionHtml()}
     </main>
   `;
@@ -553,6 +664,7 @@ function render(){
   wireGallerySection('crews');
   wirePromoSection();
   wireTriviaSection();
+  wireScheduleSection();
   wireEditorsSection();
 }
 
