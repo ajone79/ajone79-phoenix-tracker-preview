@@ -1,16 +1,16 @@
 (function(){
   const PRIMARY = [
-    {href:'index.html', label:'Home', icon:'🏠'},
-    {href:'alb-participation.html', label:'ALB Part.', icon:'📊'},
-    {href:'game-events.html', label:'Events', icon:'🗓️'},
-    {href:'f2p-task-guide.html', label:'F2P', icon:'🎯'},
-    {href:'crewing.html', label:'Crewing', icon:'🖖'},
+    {href:'/index.html', label:'Home', icon:'🏠'},
+    {href:'/alb-participation.html', label:'ALB Part.', icon:'📊'},
+    {href:'/game-events.html', label:'Events', icon:'🗓️'},
+    {href:'/f2p-task-guide.html', label:'F2P', icon:'🎯'},
+    {href:'/crewing.html', label:'Crewing', icon:'🖖'},
   ];
   const MORE = [
-    {href:'fleet-commanders.html', label:'Fleet Commanders', icon:'🧭', desc:'Best FC for your goal'},
-    {href:'sheets/stfc-sheets.html', label:'STFC Sheets', icon:'📑', desc:'Planning & calculation tools'},
-    {href:'credits.html', label:'Links & Credits', icon:'🔗', desc:'External links, thanks'},
-    {href:'admin.html', label:'Admin', icon:'🛠️', desc:'Approve logins, manage admins', adminOnly:true},
+    {href:'/fleet-commanders.html', label:'Fleet Commanders', icon:'🧭', desc:'Best FC for your goal'},
+    {href:'/sheets/stfc-sheets.html', label:'STFC Sheets', icon:'📑', desc:'Planning & calculation tools'},
+    {href:'/credits.html', label:'Links & Credits', icon:'🔗', desc:'External links, thanks'},
+    {href:'/admin.html', label:'Admin', icon:'🛠️', desc:'Approve logins, manage admins', adminOnly:true},
   ];
 
   function init(){
