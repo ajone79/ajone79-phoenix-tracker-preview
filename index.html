@@ -170,6 +170,16 @@
   .hint-modal-box p{ margin:0; color:var(--text); font-size:13.5px; line-height:1.6; white-space:pre-line; }
   .hint-modal-close{ position:absolute; top:12px; right:14px; color:var(--muted); font-size:20px; cursor:pointer; line-height:1; }
   .hint-modal-close:hover{ color:var(--text); }
+  .discord-msg{ display:flex; gap:10px; padding:10px 0; border-top:1px solid var(--line); }
+  .discord-msg:first-child{ border-top:none; }
+  .discord-avatar{ width:34px; height:34px; border-radius:50%; background:var(--panel-2); flex-shrink:0; object-fit:cover; }
+  .discord-body{ flex:1; min-width:0; }
+  .discord-head{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .discord-author{ font-weight:700; font-size:12.5px; color:var(--text); }
+  .discord-channel{ font-size:9.5px; color:var(--amber); background:rgba(242,169,59,.1); border:1px solid var(--amber-dim); border-radius:20px; padding:1px 8px; }
+  .discord-time{ font-size:10.5px; color:var(--muted); margin-left:auto; }
+  .discord-content{ font-size:13px; color:var(--text); line-height:1.5; margin-top:2px; white-space:pre-line; word-break:break-word; }
+  .discord-link{ font-size:10.5px; color:var(--teal); text-decoration:none; }
   .placeholder-note{
     color:var(--muted); font-size:13px; text-align:center;
     padding:26px 10px; border:1px dashed var(--line); border-radius:8px;
@@ -292,6 +302,7 @@
   </div>
 
   <div class="quick-nav">
+    <a href="#announcements">Announcements</a>
     <a href="#weekly">Weekly Events</a>
     <a href="#overview">Arc Overview</a>
     <a href="#crews">Suggested Crews</a>
@@ -300,6 +311,12 @@
   </div>
 
   <div class="wip-banner" id="wipBanner" style="display:none;"></div>
+
+  <section class="block" id="announcements">
+    <h2>Announcements</h2>
+    <div class="block-sub">Recent messages from Discord, synced every 15 minutes.</div>
+    <div id="discordContainer"><div class="placeholder-note">Loading…</div></div>
+  </section>
 
   <section class="block" id="weekly">
     <h2>Weekly Events</h2>
@@ -588,6 +605,49 @@ async function loadSchedule(){
   }
 }
 loadSchedule();
+
+/* ---------------- Discord announcements ---------------- */
+function relativeTime(iso){
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if(mins < 1) return 'just now';
+  if(mins < 60) return mins + 'm ago';
+  const hours = Math.round(mins / 60);
+  if(hours < 24) return hours + 'h ago';
+  const days = Math.round(hours / 24);
+  return days + 'd ago';
+}
+
+async function loadDiscordAnnouncements(){
+  const container = document.getElementById('discordContainer');
+  try{
+    const rows = await sb('discord_announcements?select=*&order=posted_at.desc&limit=15');
+    if(!rows.length){
+      container.innerHTML = '<div class="placeholder-note">No announcements synced yet.</div>';
+      return;
+    }
+    container.innerHTML = rows.map(m => `
+      <div class="discord-msg">
+        ${m.author_avatar_url
+          ? `<img class="discord-avatar" src="${escapeHtml(m.author_avatar_url)}" alt="" loading="lazy">`
+          : `<div class="discord-avatar"></div>`}
+        <div class="discord-body">
+          <div class="discord-head">
+            <span class="discord-author">${escapeHtml(m.author_name)}</span>
+            ${m.channel_label ? `<span class="discord-channel">${escapeHtml(m.channel_label)}</span>` : ''}
+            <span class="discord-time">${relativeTime(m.posted_at)}</span>
+          </div>
+          <div class="discord-content">${escapeHtml(m.content)}</div>
+          <a class="discord-link" href="${escapeHtml(m.message_url)}" target="_blank" rel="noopener noreferrer">View on Discord ↗</a>
+        </div>
+      </div>
+    `).join('');
+  }catch(e){
+    console.error('loadDiscordAnnouncements failed', e);
+    container.innerHTML = '<div class="placeholder-note">Could not load announcements. Please refresh.</div>';
+  }
+}
+loadDiscordAnnouncements();
 
 const glightbox = document.getElementById('glightbox');
 
