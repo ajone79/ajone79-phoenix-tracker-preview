@@ -491,13 +491,23 @@ function render(){
 
     if(!ev.startUTC) return;
     const startZ = toZoned(ev.startUTC, tzValue);
-    // The lookback window itself is what limits how much history shows — no separate
-    // "hide already-ended events" check, since showing recently-finished events on the
-    // days you can scroll back to is the whole point.
-    if(startZ.dateISO < winStart || startZ.dateISO > winEnd) return;
+    if(startZ.dateISO > winEnd) return;
+
+    // Normally an event is bucketed under its own start day, and the lookback window
+    // is what limits how much history shows. But a longer-running event (e.g. Maverick
+    // Tasks, which spans a full week) can still be currently active even though it
+    // started further back than the lookback reaches — rather than silently dropping
+    // it, show it on the earliest visible day instead. Something that's genuinely
+    // finished before the window even starts is still dropped.
+    let bucketDateISO = startZ.dateISO;
+    if(bucketDateISO < winStart){
+      const endMs = ev.endUTC ? new Date(ev.endUTC).getTime() : new Date(ev.startUTC).getTime();
+      if(endMs < nowMs) return;
+      bucketDateISO = winStart;
+    }
 
     const endZ = ev.endUTC ? toZoned(ev.endUTC, tzValue) : null;
-    (byDay[startZ.dateISO] = byDay[startZ.dateISO] || []).push({ev, startZ, endZ, opsMin, opsMax});
+    (byDay[bucketDateISO] = byDay[bucketDateISO] || []).push({ev, startZ, endZ, opsMin, opsMax});
   });
 
   Object.values(byDay).forEach(list => list.sort((a,b) => a.startZ.h*60+a.startZ.m - (b.startZ.h*60+b.startZ.m)));
