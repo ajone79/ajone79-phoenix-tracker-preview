@@ -170,6 +170,14 @@
   .hint-modal-box p{ margin:0; color:var(--text); font-size:13.5px; line-height:1.6; white-space:pre-line; }
   .hint-modal-close{ position:absolute; top:12px; right:14px; color:var(--muted); font-size:20px; cursor:pointer; line-height:1; }
   .hint-modal-close:hover{ color:var(--text); }
+  .discord-newdot{ display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--alert); margin-left:6px; vertical-align:middle; }
+  .discord-preview{ display:flex; align-items:center; gap:10px; cursor:pointer; padding:4px 0; }
+  .discord-preview:hover .discord-expand-hint{ color:var(--text); }
+  .discord-preview .discord-preview-text{ flex:1; min-width:0; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .discord-preview .discord-preview-author{ font-weight:700; color:var(--teal); }
+  .discord-expand-hint{ font-size:11px; color:var(--muted); flex-shrink:0; white-space:nowrap; }
+  .discord-list{ display:none; margin-top:8px; }
+  .discord-list.open{ display:block; }
   .discord-msg{ display:flex; gap:10px; padding:10px 0; border-top:1px solid var(--line); }
   .discord-msg:first-child{ border-top:none; }
   .discord-avatar{ width:34px; height:34px; border-radius:50%; background:var(--panel-2); flex-shrink:0; object-fit:cover; }
@@ -313,9 +321,10 @@
   <div class="wip-banner" id="wipBanner" style="display:none;"></div>
 
   <section class="block" id="announcements">
-    <h2>Announcements</h2>
-    <div class="block-sub">Recent messages from Discord, synced every 15 minutes.</div>
-    <div id="discordContainer"><div class="placeholder-note">Loading…</div></div>
+    <h2>Announcements<span class="discord-newdot" id="discordNewDot" style="display:none;"></span></h2>
+    <div class="block-sub">Recent messages from Discord, synced every 15 minutes. Tap to expand.</div>
+    <div id="discordPreview"><div class="placeholder-note">Loading…</div></div>
+    <div class="discord-list" id="discordList"></div>
   </section>
 
   <section class="block" id="weekly">
@@ -618,33 +627,71 @@ function relativeTime(iso){
   return days + 'd ago';
 }
 
+const DISCORD_SEEN_KEY = 'phx_discord_last_seen';
+let discordExpanded = false;
+
+function truncate1Line(s, n){
+  const oneLine = s.replace(/\s+/g, ' ').trim();
+  return oneLine.length > n ? oneLine.slice(0, n - 1).trimEnd() + '…' : oneLine;
+}
+
+function renderDiscordList(rows){
+  return rows.map(m => `
+    <div class="discord-msg">
+      ${m.author_avatar_url
+        ? `<img class="discord-avatar" src="${escapeHtml(m.author_avatar_url)}" alt="" loading="lazy">`
+        : `<div class="discord-avatar"></div>`}
+      <div class="discord-body">
+        <div class="discord-head">
+          <span class="discord-author">${escapeHtml(m.author_name)}</span>
+          ${m.channel_label ? `<span class="discord-channel">${escapeHtml(m.channel_label)}</span>` : ''}
+          <span class="discord-time">${relativeTime(m.posted_at)}</span>
+        </div>
+        <div class="discord-content">${escapeHtml(m.content)}</div>
+        <a class="discord-link" href="${escapeHtml(m.message_url)}" target="_blank" rel="noopener noreferrer">View on Discord ↗</a>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleDiscordExpanded(rows){
+  discordExpanded = !discordExpanded;
+  const list = document.getElementById('discordList');
+  list.classList.toggle('open', discordExpanded);
+  document.getElementById('discordExpandHint').textContent = discordExpanded ? '▴ Hide' : '▾ Expand';
+  if(discordExpanded && rows.length){
+    localStorage.setItem(DISCORD_SEEN_KEY, rows[0].posted_at);
+    document.getElementById('discordNewDot').style.display = 'none';
+  }
+}
+
 async function loadDiscordAnnouncements(){
-  const container = document.getElementById('discordContainer');
+  const preview = document.getElementById('discordPreview');
+  const list = document.getElementById('discordList');
   try{
     const rows = await sb('discord_announcements?select=*&order=posted_at.desc&limit=15');
     if(!rows.length){
-      container.innerHTML = '<div class="placeholder-note">No announcements synced yet.</div>';
+      preview.innerHTML = '<div class="placeholder-note">No announcements synced yet.</div>';
       return;
     }
-    container.innerHTML = rows.map(m => `
-      <div class="discord-msg">
-        ${m.author_avatar_url
-          ? `<img class="discord-avatar" src="${escapeHtml(m.author_avatar_url)}" alt="" loading="lazy">`
-          : `<div class="discord-avatar"></div>`}
-        <div class="discord-body">
-          <div class="discord-head">
-            <span class="discord-author">${escapeHtml(m.author_name)}</span>
-            ${m.channel_label ? `<span class="discord-channel">${escapeHtml(m.channel_label)}</span>` : ''}
-            <span class="discord-time">${relativeTime(m.posted_at)}</span>
-          </div>
-          <div class="discord-content">${escapeHtml(m.content)}</div>
-          <a class="discord-link" href="${escapeHtml(m.message_url)}" target="_blank" rel="noopener noreferrer">View on Discord ↗</a>
-        </div>
+
+    const lastSeen = localStorage.getItem(DISCORD_SEEN_KEY);
+    const hasNew = !lastSeen || new Date(rows[0].posted_at) > new Date(lastSeen);
+    document.getElementById('discordNewDot').style.display = hasNew ? 'inline-block' : 'none';
+
+    const latest = rows[0];
+    preview.innerHTML = `
+      <div class="discord-preview" id="discordPreviewRow">
+        <span class="discord-preview-author">${escapeHtml(latest.author_name)}:</span>
+        <span class="discord-preview-text">${escapeHtml(truncate1Line(latest.content, 70))}</span>
+        <span class="discord-expand-hint" id="discordExpandHint">▾ Expand</span>
       </div>
-    `).join('');
+    `;
+    list.innerHTML = renderDiscordList(rows);
+    document.getElementById('discordPreviewRow').addEventListener('click', () => toggleDiscordExpanded(rows));
   }catch(e){
     console.error('loadDiscordAnnouncements failed', e);
-    container.innerHTML = '<div class="placeholder-note">Could not load announcements. Please refresh.</div>';
+    preview.innerHTML = '<div class="placeholder-note">Could not load announcements. Please refresh.</div>';
   }
 }
 loadDiscordAnnouncements();
