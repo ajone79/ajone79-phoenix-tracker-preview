@@ -40,7 +40,7 @@
   .sub{color:var(--muted); font-size:13px; font-family:var(--mono);}
 
   .controls{
-    position:sticky; top:36px; z-index:20;
+    position:sticky; top:0; z-index:20;
     background:rgba(10,13,18,0.96); backdrop-filter:blur(6px);
     border-bottom:1px solid var(--border); padding:10px 16px;
     display:flex; flex-direction:column; gap:8px;
@@ -55,6 +55,16 @@
     border-radius:6px; padding:7px 9px; font-family:var(--mono); font-size:13px;
   }
   select:focus, input:focus{outline:2px solid var(--blue); outline-offset:1px;}
+
+  .adv-toggle{
+    font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase;
+    background:transparent; border:1px solid var(--border); color:var(--muted);
+    border-radius:6px; padding:7px 12px; cursor:pointer; margin-left:auto;
+  }
+  .adv-toggle:hover{ color:var(--text); border-color:var(--muted); }
+  .adv-filters{ display:flex; flex-direction:column; gap:10px; }
+  .adv-filters.collapsed{ display:none; }
+
   .search-wrap{flex:1; min-width:140px;}
   .search-wrap input{width:100%;}
   .btn{
@@ -174,13 +184,16 @@
     <span class="range-label" id="rangeLabel"></span>
     <button class="btn primary" id="todayRange">Today</button>
     <button class="btn" id="nextRange">Later 4wk ›</button>
+    <button class="adv-toggle" id="advToggle">Advanced Filters ▾</button>
   </div>
-  <div class="row" id="gradeChipRow"></div>
-  <div class="row">
-    <span class="field-label">Timezone</span>
-    <select id="tzSelect"></select>
+  <div class="adv-filters collapsed" id="advFilters">
+    <div class="row" id="gradeChipRow"></div>
+    <div class="row">
+      <span class="field-label">Timezone</span>
+      <select id="tzSelect"></select>
+    </div>
+    <div class="row" id="keyChipRow"></div>
   </div>
-  <div class="row" id="keyChipRow"></div>
 </div>
 
 <div id="detailOverlay" class="detail-overlay">
@@ -520,4 +533,21 @@ async function loadDataAndInit(){
 loadDataAndInit();
 </script>
 </body>
+<script>
+(function(){
+  const KEY = 'phx_advFiltersOpen_gantt';
+  const btn = document.getElementById('advToggle');
+  const panel = document.getElementById('advFilters');
+  function apply(open){
+    panel.classList.toggle('collapsed', !open);
+    btn.textContent = 'Advanced Filters ' + (open ? '▴' : '▾');
+  }
+  apply(localStorage.getItem(KEY) === '1');
+  btn.addEventListener('click', () => {
+    const nowOpen = panel.classList.contains('collapsed');
+    apply(nowOpen);
+    localStorage.setItem(KEY, nowOpen ? '1' : '0');
+  });
+})();
+</script>
 </html>
