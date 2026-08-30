@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoenix EU168 — Weekly Gantt View</title>
+<meta name="description" content="Weekly Gantt-style view of scheduled Star Trek Fleet Command events for Phoenix EU168.">
+<script src="assets/phx-nav-menu.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/tracker-auth.js"></script>
+<style>
+  :root{
+    --bg:#0A0D12; --panel:#12161D; --panel-alt:#171C25; --border:#232A35;
+    --text:#D8DEE9; --muted:#7C8798; --amber:#FFB454; --blue:#5FB4E5;
+    --red:#FF6B6B; --purple:#B98CE0; --green:#6EE7B7;
+    --mono: 'SF Mono', 'Consolas', 'Menlo', monospace;
+    --disp: 'Segoe UI Semibold', 'Segoe UI', system-ui, sans-serif;
+    --daycol: 128px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(95,180,229,0.08), transparent 40%),
+      radial-gradient(ellipse at 100% 0%, rgba(255,180,84,0.06), transparent 45%),
+      var(--bg);
+    color:var(--text); font-family:var(--disp); -webkit-font-smoothing:antialiased;
+    padding-bottom:50px;
+  }
+  header{
+    padding:20px 16px 14px; border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg, rgba(255,180,84,0.05), transparent);
+  }
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--amber); display:flex; align-items:center; gap:8px;
+  }
+  .eyebrow::before{content:""; width:22px;height:8px; background:var(--amber); display:inline-block;}
+  h1{margin:8px 0 4px; font-size:21px; line-height:1.2;}
+  .sub{color:var(--muted); font-size:13px; font-family:var(--mono);}
+
+  .controls{
+    position:sticky; top:36px; z-index:20;
+    background:rgba(10,13,18,0.96); backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--border); padding:10px 16px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .row{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+  .field-label{
+    font-family:var(--mono); font-size:10px; text-transform:uppercase;
+    letter-spacing:.1em; color:var(--muted); margin-bottom:3px; display:block;
+  }
+  select, input[type=text]{
+    background:var(--panel-alt); border:1px solid var(--border); color:var(--text);
+    border-radius:6px; padding:7px 9px; font-family:var(--mono); font-size:13px;
+  }
+  select:focus, input:focus{outline:2px solid var(--blue); outline-offset:1px;}
+  .search-wrap{flex:1; min-width:140px;}
+  .search-wrap input{width:100%;}
+  .btn{
+    font-family:var(--mono); font-size:12px; letter-spacing:.04em;
+    padding:8px 14px; border-radius:6px; border:1px solid var(--border);
+    background:var(--panel-alt); color:var(--text); cursor:pointer;
+    text-decoration:none; display:inline-flex; align-items:center;
+  }
+  .btn:hover{border-color:var(--blue);}
+  .btn.primary{border-color:var(--amber); color:var(--amber);}
+  .range-label{font-family:var(--mono); font-size:13px; font-weight:600; flex:1; text-align:center; min-width:180px;}
+  .chip{
+    font-family:var(--mono); font-size:11px; letter-spacing:.03em;
+    padding:6px 10px; border-radius:20px; border:1px solid var(--border); background:var(--panel-alt);
+    color:var(--muted); cursor:pointer; user-select:none;
+  }
+  .chip.on{color:var(--text); border-color:currentColor; background:rgba(255,255,255,0.03);}
+  .chip-sm{font-size:9.5px; padding:4px 8px;}
+  .chip-clear{color:var(--red); border-color:var(--red); font-weight:700;}
+
+  .detail-overlay{
+    display:none; position:fixed; inset:0; z-index:500;
+    background:rgba(5,7,10,0.72); backdrop-filter:blur(2px);
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .detail-overlay.open{display:flex;}
+  .detail-panel{
+    position:relative; width:100%; max-width:520px; max-height:80vh; overflow-y:auto;
+    padding:18px 18px 20px; border:1px solid var(--border);
+    border-radius:14px; background:var(--panel-alt); font-size:12.5px; color:var(--muted);
+    box-shadow:0 12px 40px rgba(0,0,0,0.5);
+  }
+  .detail-panel .dt-title{color:var(--text); font-weight:700; font-size:14px; margin:2px 28px 4px 0;}
+  .detail-panel .dt-meta{font-family:var(--mono); font-size:11px; margin-bottom:8px;}
+  .detail-close-btn{
+    position:absolute; top:12px; right:12px; width:28px; height:28px; border-radius:50%;
+    border:1px solid var(--border); background:var(--panel); color:var(--text);
+    font-family:var(--mono); font-size:14px; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .detail-close-btn:active{background:var(--border);}
+
+  /* ===== Multi-week day-grid ===== */
+  .gantt-scroll{overflow-x:auto; padding:14px 0 0 16px;}
+  .gantt-inner{display:inline-block; min-width:100%;}
+  .week-block{
+    border:1px solid var(--border); border-radius:10px; overflow:hidden;
+    margin-bottom:16px; background:var(--panel);
+    width:calc(var(--daycol) * 7);
+  }
+  .week-block-label{
+    font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--amber); padding:6px 10px; background:var(--panel-alt); border-bottom:1px solid var(--border);
+  }
+  .week-grid{
+    display:grid;
+    grid-template-columns: repeat(7, var(--daycol));
+    grid-auto-rows: 30px;
+    row-gap:2px;
+  }
+  .day-header{
+    grid-row:1; padding:6px 4px; text-align:center; border-right:1px solid var(--border);
+    border-bottom:1px solid var(--border); background:var(--panel-alt);
+    font-family:var(--mono); position:sticky; top:0;
+  }
+  .day-header .dname{font-size:11px; font-weight:700; color:var(--text);}
+  .day-header .ddate{font-size:9.5px; color:var(--muted);}
+  .day-header.today{background:rgba(110,231,183,0.14);}
+  .day-header.today .dname{color:var(--green);}
+  .day-header.weekend .dname{color:var(--purple);}
+  .day-col-bg{
+    grid-row: 2 / -1; border-right:1px solid var(--border);
+  }
+  .day-col-bg.today{background:rgba(110,231,183,0.05);}
+  .day-col-bg.weekend{background:rgba(185,140,224,0.04);}
+  .gantt-bar{
+    margin:1px 2px; border-radius:5px; font-family:var(--mono); font-size:10px;
+    color:#05070a; font-weight:700; display:flex; align-items:center; padding:0 6px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; opacity:0.94;
+    min-width:0;
+  }
+  .gantt-bar:active{opacity:1;}
+  .empty-note{padding:24px 16px; color:var(--muted); font-size:12px; font-style:italic; text-align:center;}
+  footer{padding:18px 16px 10px; color:var(--muted); font-family:var(--mono); font-size:10.5px; text-align:center;}
+
+.phx-nav{
+  position:sticky; top:0; z-index:9999; display:flex; align-items:center; gap:4px;
+  background:#0a0a0d; border-bottom:2px solid #f2a93b; padding:0 14px; height:36px;
+  font-family:ui-monospace,'SF Mono','Consolas',monospace; overflow-x:auto; white-space:nowrap;
+}
+.phx-nav .phx-nav-tag{color:#f2a93b; font-weight:700; letter-spacing:.12em; font-size:11px; margin-right:12px; flex-shrink:0;}
+.phx-nav a{
+  color:#9a9aa4; text-decoration:none; font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+  padding:8px 12px; border-radius:0 0 6px 6px; transition:color .15s ease, background .15s ease; flex-shrink:0;
+}
+.phx-nav a:hover{ color:#e8e6e1; background:rgba(255,255,255,.06); }
+.phx-nav a.current{ color:#0a0a0d; background:#f2a93b; font-weight:700; }
+</style>
+</head>
+<body>
+<nav class="phx-nav"><span class="phx-nav-tag">PHX</span><a href="index.html">🏠 Home</a><a href="gantt-events.html" class="current">Weekly Gantt View</a></nav>
+
+<header>
+  <div class="eyebrow">Global Feed · stfc.cfd + Territory Capture + Voyage</div>
+  <h1>Phoenix EU168 — Weekly Gantt View</h1>
+  <div class="sub">4 weeks stacked, day-by-day · Swipe sideways if it doesn't fit your screen · Tap a bar for details</div>
+</header>
+
+<div class="controls">
+  <div class="row">
+    <div class="search-wrap">
+      <span class="field-label">Search</span>
+      <input type="text" id="searchBox" placeholder="event name…">
+    </div>
+    <a class="btn primary" href="game-events.html">Calendar View</a>
+  </div>
+  <div class="row">
+    <button class="btn" id="prevRange">‹ Earlier 4wk</button>
+    <span class="range-label" id="rangeLabel"></span>
+    <button class="btn primary" id="todayRange">Today</button>
+    <button class="btn" id="nextRange">Later 4wk ›</button>
+  </div>
+  <div class="row" id="gradeChipRow"></div>
+  <div class="row">
+    <span class="field-label">Timezone</span>
+    <select id="tzSelect"></select>
+  </div>
+  <div class="row" id="keyChipRow"></div>
+</div>
+
+<div id="detailOverlay" class="detail-overlay">
+  <div id="detailPanel" class="detail-panel">
+    <button class="detail-close-btn" id="detailCloseBtn" aria-label="Close">✕</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<div class="gantt-scroll">
+  <div class="gantt-inner" id="ganttInner"></div>
+</div>
+
+<footer>stfc.cfd events refreshed daily · Territory Capture and Voyage Across the Void are hand-maintained indefinite weekly recurrences · Bars show whole active days, not exact hours</footer>
+
+<script src="assets/game-events-data.js"></script>
+<script>
+let GAME_EVENTS = [];
+
+const WEEKS_SHOWN = 4;
+let activeTypes = new Set();
+let selectedGrade = null; // null = show all grades; otherwise a single 'G1'..'G8' (isolate on tap)
+let ticketedVisible = true; // default-on, same as every type chip — click hides ticketed events specifically
+let rangeBlockOffset = 0; // shifts by WEEKS_SHOWN each Prev/Next click
+const el = id => document.getElementById(id);
+
+/* ===== Time helpers ===== */
+/* ===== Format merging (same as game-events.html) ===== */
+/* ===== Row packing: assign non-overlapping events to shared rows ===== */
+function packRows(items){
+  const sorted = [...items].sort((a,b) => a.startDay - b.startDay || a.endDay - b.endDay);
+  const rows = [];
+  sorted.forEach(item => {
+    let placed = false;
+    for(const row of rows){
+      if(item.startDay > row.lastEndDay){
+        row.items.push(item);
+        row.lastEndDay = item.endDay;
+        placed = true;
+        break;
+      }
+    }
+    if(!placed) rows.push({lastEndDay:item.endDay, items:[item]});
+  });
+  return rows.map(r => r.items);
+}
+
+/* ===== Controls ===== */
+function buildTzSelect(){
+  el('tzSelect').innerHTML = TZ_OPTIONS.map(t => '<option value="'+t.offset+'"'+(t.offset==='uk-auto'?' selected':'')+'>'+t.label+'</option>').join('');
+}
+function buildChips(){
+  // "Key" row: doubles as the color legend and the type filter, plus Ticketed.
+  // All pills work identically — inclusive, default-on, click hides that
+  // category, click again brings it back.
+  const wrap = el('keyChipRow');
+  wrap.innerHTML = '';
+
+  const clearChip = document.createElement('div');
+  clearChip.className = 'chip chip-sm chip-clear';
+  clearChip.textContent = 'Clear All';
+  clearChip.title = 'Hide everything, then pick just the ones you want';
+  clearChip.addEventListener('click', () => {
+    activeTypes.clear();
+    ticketedVisible = false;
+    buildChips(); render();
+  });
+  wrap.appendChild(clearChip);
+
+  Object.keys(GAME_CATS).forEach(key => {
+    const cat = GAME_CATS[key];
+    const chip = document.createElement('div');
+    chip.className = 'chip chip-sm' + (activeTypes.has(key) ? ' on' : '');
+    chip.style.color = cat.color;
+    chip.textContent = cat.label;
+    chip.title = 'Toggle this type on/off';
+    chip.addEventListener('click', () => {
+      if(activeTypes.has(key)) activeTypes.delete(key); else activeTypes.add(key);
+      buildChips(); render();
+    });
+    wrap.appendChild(chip);
+  });
+  const ticketedChip = document.createElement('div');
+  ticketedChip.className = 'chip chip-sm' + (ticketedVisible ? ' on' : '');
+  ticketedChip.style.color = '#FFD54F';
+  ticketedChip.textContent = 'Ticketed';
+  ticketedChip.title = 'Toggle ticketed events on/off';
+  ticketedChip.addEventListener('click', () => { ticketedVisible = !ticketedVisible; buildChips(); render(); });
+  wrap.appendChild(ticketedChip);
+}
+function buildGradeChips(){
+  const wrap = el('gradeChipRow');
+  wrap.innerHTML = '';
+  Object.keys(GRADE_BANDS).forEach(g => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (selectedGrade === g ? ' on' : '');
+    chip.style.color = 'var(--blue)';
+    chip.textContent = g;
+    chip.title = 'Ops ' + GRADE_BANDS[g][0] + '–' + GRADE_BANDS[g][1] + ' — tap to isolate, tap again for all grades';
+    chip.addEventListener('click', () => {
+      selectedGrade = (selectedGrade === g) ? null : g;
+      buildGradeChips(); render();
+    });
+    wrap.appendChild(chip);
+  });
+}
+function escapeHTML(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+function fmtTime(h,m){
+  const ap = h>=12?'PM':'AM';
+  let hh = h%12; if(hh===0) hh=12;
+  return hh+':'+String(m).padStart(2,'0')+' '+ap;
+}
+
+/* ===== Render ===== */
+function render(){
+  const tzValue = el('tzSelect').value;
+  const search = el('searchBox').value.trim().toLowerCase();
+  const nowMs = Date.now();
+
+  const todayISO = toZoned(new Date().toISOString(), tzValue).dateISO;
+  const currentBlockMonday = mondayOnOrBefore(todayISO);
+  const blockStartISO = addDays(currentBlockMonday, rangeBlockOffset * 7 * WEEKS_SHOWN);
+  const blockEndISO = addDays(blockStartISO, WEEKS_SHOWN*7 - 1);
+
+  const [sy,smo,sd] = blockStartISO.split('-').map(Number);
+  const [ey,emo,ed] = blockEndISO.split('-').map(Number);
+  const startLabel = new Date(Date.UTC(sy,smo-1,sd)).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+  const endLabel = new Date(Date.UTC(ey,emo-1,ed)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});
+  el('rangeLabel').textContent = startLabel + ' – ' + endLabel + (rangeBlockOffset===0?' (current)':'');
+
+  // Widen generation window slightly so multi-day events starting just
+  // before the block still appear (clipped) at the block's start.
+  const genStart = addDays(blockStartISO, -7);
+  const genEnd = addDays(blockEndISO, 7);
+  const candidateEvents = [
+    ...buildMergedEvents(GAME_EVENTS).filter(e => e.eventSubType !== 'voyage_across_the_void'),
+    ...generateRecurringEvents(TERRITORY_EVENTS, genStart, genEnd),
+    ...generateRecurringEvents(VOYAGE_EVENTS, genStart, genEnd),
+    ...generateRecurringEvents(TUESDAY_EVENTS, genStart, genEnd)
+  ];
+
+  const filtered = candidateEvents.filter(ev => {
+    if(!activeTypes.has(ev.displayType)) return false;
+    if(!ticketedVisible && ev.eventSubType === 'ticketed') return false;
+    if(search && !ev.title.toLowerCase().includes(search)) return false;
+    if(!ev.startUTC) return false;
+    const opsMin = ev.minOpsLevel == null ? 1 : ev.minOpsLevel;
+    const opsMax = ev.maxOpsLevel == null ? 999 : ev.maxOpsLevel;
+    if(selectedGrade){
+      const [gMin,gMax] = GRADE_BANDS[selectedGrade];
+      if(!(opsMin <= gMax && opsMax >= gMin)) return false;
+    }
+    return true;
+  });
+
+  const inner = el('ganttInner');
+  inner.innerHTML = '';
+  el('detailOverlay').classList.remove('open');
+
+  let anyEventsAtAll = false;
+
+  for(let w=0; w<WEEKS_SHOWN; w++){
+    const weekStartISO = addDays(blockStartISO, w*7);
+    const weekEndISO = addDays(weekStartISO, 6);
+    const weekStartUTC = ukLocalToUTC(weekStartISO, 0, 0);
+    const weekEndUTC = ukLocalToUTC(addDays(weekEndISO,1), 0, 0);
+    const weekStartMs = new Date(weekStartUTC).getTime();
+    const weekEndMs = new Date(weekEndUTC).getTime();
+
+    // Clip candidate events to this week and compute day indices (0-6)
+    const weekItems = [];
+    filtered.forEach(ev => {
+      const opsMin = ev.minOpsLevel == null ? 1 : ev.minOpsLevel;
+      const opsMax = ev.maxOpsLevel == null ? 999 : ev.maxOpsLevel;
+      const startMs = new Date(ev.startUTC).getTime();
+      const endMs = ev.endUTC ? new Date(ev.endUTC).getTime() : startMs;
+      if(endMs <= weekStartMs || startMs >= weekEndMs) return;
+      const startZ = toZoned(new Date(Math.max(startMs, weekStartMs)).toISOString(), tzValue);
+      const endZraw = toZoned(new Date(Math.min(endMs, weekEndMs)).toISOString(), tzValue);
+      // If the (clipped) end lands exactly on local midnight, the event's active
+      // span doesn't actually include that calendar day — attribute the end to
+      // the day before instead. Doing this AFTER timezone conversion (not by
+      // subtracting 1ms beforehand) avoids a positive UTC offset like BST
+      // pushing a near-midnight UTC instant into the next local calendar day.
+      const effectiveEndDateISO = (endZraw.h === 0 && endZraw.m === 0) ? addDays(endZraw.dateISO, -1) : endZraw.dateISO;
+      let startDay = Math.max(0, dayIndexBetween(weekStartISO, startZ.dateISO));
+      let endDay = Math.min(6, dayIndexBetween(weekStartISO, effectiveEndDateISO));
+      if(endDay < startDay) endDay = startDay;
+      weekItems.push({ev, opsMin, opsMax, startDay, endDay});
+    });
+
+    if(weekItems.length) anyEventsAtAll = true;
+
+    const packedRows = packRows(weekItems);
+    const rowCount = Math.max(packedRows.length, 1);
+
+    const block = document.createElement('div');
+    block.className = 'week-block';
+
+    const label = document.createElement('div');
+    label.className = 'week-block-label';
+    label.textContent = 'Week of ' + startLabelFor(weekStartISO);
+    block.appendChild(label);
+
+    const grid = document.createElement('div');
+    grid.className = 'week-grid';
+    grid.style.gridTemplateRows = '30px repeat(' + rowCount + ', 30px)';
+
+    // Day headers + background columns
+    dateRangeList(weekStartISO, weekEndISO).forEach((dISO, idx) => {
+      const [y,mo,d] = dISO.split('-').map(Number);
+      const jsDate = new Date(Date.UTC(y,mo-1,d));
+      const dname = jsDate.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'});
+      const ddate = jsDate.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+      const dow = dowOf(dISO);
+      const isToday = dISO === todayISO;
+      const isWeekend = (dow===0||dow===6);
+
+      const bg = document.createElement('div');
+      bg.className = 'day-col-bg' + (isToday?' today':'') + (isWeekend?' weekend':'');
+      bg.style.gridColumn = (idx+1) + ' / span 1';
+      grid.appendChild(bg);
+
+      const head = document.createElement('div');
+      head.className = 'day-header' + (isToday?' today':'') + (isWeekend?' weekend':'');
+      head.style.gridColumn = (idx+1) + ' / span 1';
+      head.innerHTML = '<div class="dname">'+dname+'</div><div class="ddate">'+ddate+'</div>';
+      grid.appendChild(head);
+    });
+
+    // Bars
+    packedRows.forEach((rowItems, rowIdx) => {
+      rowItems.forEach(({ev, opsMin, opsMax, startDay, endDay}) => {
+        const catDef = GAME_CATS[ev.displayType] || GAME_CATS[''];
+        const bar = document.createElement('div');
+        bar.className = 'gantt-bar';
+        bar.style.gridColumn = (startDay+1) + ' / span ' + (endDay-startDay+1);
+        bar.style.gridRow = (rowIdx+2) + ' / span 1';
+        bar.style.background = catDef.color;
+        const fmtSuffix = (ev.formats && ev.formats.length) ? ' ('+ev.formats.join('/')+')' : '';
+        bar.textContent = ev.title + fmtSuffix;
+        bar.addEventListener('click', () => showDetail(ev, opsMin, opsMax, tzValue, catDef));
+        grid.appendChild(bar);
+      });
+    });
+
+    block.appendChild(grid);
+    inner.appendChild(block);
+  }
+
+  if(!anyEventsAtAll){
+    inner.innerHTML = '<div class="empty-note">No events match your filters in this 4-week range.</div>';
+  }
+}
+function startLabelFor(dISO){
+  const [y,mo,d] = dISO.split('-').map(Number);
+  return new Date(Date.UTC(y,mo-1,d)).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+}
+function showDetail(ev, opsMin, opsMax, tzValue, catDef){
+  const opsLabel = opsMax>=999 ? (opsMin+'+') : (opsMin+'–'+opsMax);
+  const startZ = toZoned(ev.startUTC, tzValue);
+  const endZ = ev.endUTC ? toZoned(ev.endUTC, tzValue) : null;
+  const timeLabel = endZ
+    ? fmtTime(startZ.h,startZ.m) + ' → ' + fmtTime(endZ.h,endZ.m) + (endZ.dateISO!==startZ.dateISO?' ('+startZ.dateISO+' → '+endZ.dateISO+')':'')
+    : fmtTime(startZ.h,startZ.m);
+  el('detailContent').innerHTML =
+    '<div class="dt-title">'+escapeHTML(ev.title)+'</div>'+
+    '<div class="dt-meta" style="color:'+catDef.color+'">'+catDef.label+
+      ((ev.formats&&ev.formats.length)?' · '+ev.formats.join('/'):'')+
+      ' · '+timeLabel+' · Ops '+opsLabel+'</div>'+
+    (ev.description ? '<div>'+escapeHTML(ev.description)+'</div>' : '');
+  openDetailModal();
+}
+
+/* =========================================================
+   MODAL OPEN/CLOSE — a hardware/software back-button press
+   should close this overlay, not navigate away from the page.
+   We push one extra history entry when opening; the back button
+   then pops that entry first (firing 'popstate', which we use to
+   close the modal) rather than leaving the page. Closing via the
+   X button consumes that same entry via history.back(), so the
+   back-stack never grows unbounded from repeated opens/closes.
+   ========================================================= */
+let modalHistoryPushed = false;
+function openDetailModal(){
+  el('detailOverlay').classList.add('open');
+  if(!modalHistoryPushed){
+    history.pushState({ganttModal:true}, '', location.href);
+    modalHistoryPushed = true;
+  }
+}
+function closeDetailModal(fromPopState){
+  el('detailOverlay').classList.remove('open');
+  if(modalHistoryPushed){
+    modalHistoryPushed = false;
+    if(!fromPopState) history.back();
+  }
+}
+window.addEventListener('popstate', () => {
+  if(el('detailOverlay').classList.contains('open')){
+    closeDetailModal(true);
+  }
+});
+
+/* ===== Init ===== */
+async function loadDataAndInit(){
+  const {events} = await loadGameEventsFeed();
+  GAME_EVENTS = events;
+
+  augmentCategoriesFromEvents(buildMergedEvents(GAME_EVENTS));
+  activeTypes = new Set(Object.keys(GAME_CATS));
+  // These are noisy/high-volume by default — start hidden, easy to turn back on
+  ['territory', 'battlepass', 'voyage'].forEach(k => activeTypes.delete(k));
+  ticketedVisible = false;
+
+  buildTzSelect();
+  buildChips();
+  buildGradeChips();
+  render();
+
+  ['tzSelect','searchBox'].forEach(id => {
+    el(id).addEventListener('input', render);
+    el(id).addEventListener('change', render);
+  });
+  el('prevRange').addEventListener('click', () => { rangeBlockOffset -= 1; render(); });
+  el('nextRange').addEventListener('click', () => { rangeBlockOffset += 1; render(); });
+  el('todayRange').addEventListener('click', () => { rangeBlockOffset = 0; render(); });
+  el('detailCloseBtn').addEventListener('click', () => closeDetailModal(false));
+  el('detailOverlay').addEventListener('click', (e) => {
+    if(e.target.id === 'detailOverlay') closeDetailModal(false); // clicked the dark backdrop, not the panel itself
+  });
+}
+loadDataAndInit();
+</script>
+</body>
+</html>
