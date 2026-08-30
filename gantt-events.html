@@ -220,6 +220,66 @@ let ticketedVisible = true; // default-on, same as every type chip — click hid
 let rangeBlockOffset = 0; // shifts by WEEKS_SHOWN each Prev/Next click
 const el = id => document.getElementById(id);
 
+/* ---------------- SAVED FILTER PREFERENCES (server-side, per logged-in user) ---------------- */
+/* Same pattern as game-events.html, stored under a separate 'eventsGantt' key so the two
+   pages' saved selections never overwrite each other. Date range position is intentionally
+   NOT persisted — always opens on the current week, like the calendar view does. */
+let filterPrefsLoaded = false; // gate saving until a restore attempt has happened first
+let saveFilterPrefsTimeout = null;
+
+function currentFilterPrefs(){
+  return {
+    activeTypes: Array.from(activeTypes),
+    selectedGrade,
+    ticketedVisible,
+    tz: el('tzSelect') ? el('tzSelect').value : undefined,
+    search: el('searchBox') ? el('searchBox').value : undefined
+  };
+}
+
+function applyFilterPrefs(prefs){
+  if(!prefs || typeof prefs !== 'object') return;
+  if(Array.isArray(prefs.activeTypes)){
+    activeTypes = new Set(prefs.activeTypes.filter(t => GAME_CATS[t]));
+  }
+  if(prefs.selectedGrade === null || (typeof prefs.selectedGrade === 'string' && GRADE_BANDS[prefs.selectedGrade])){
+    selectedGrade = prefs.selectedGrade;
+  }
+  if(typeof prefs.ticketedVisible === 'boolean') ticketedVisible = prefs.ticketedVisible;
+  if(prefs.tz && el('tzSelect') && Array.from(el('tzSelect').options).some(o => o.value === prefs.tz)){
+    el('tzSelect').value = prefs.tz;
+  }
+  if(typeof prefs.search === 'string' && el('searchBox')){
+    el('searchBox').value = prefs.search;
+  }
+}
+
+function saveFilterPrefs(){
+  if(!filterPrefsLoaded || !window.__trackerSb) return; // don't save until restore has happened, and only if authenticated
+  clearTimeout(saveFilterPrefsTimeout);
+  saveFilterPrefsTimeout = setTimeout(async ()=>{
+    try{
+      await window.__trackerSb.rpc('update_my_preferences', { new_prefs: { eventsGantt: currentFilterPrefs() } });
+    }catch(e){
+      console.error('Failed to save filter preferences', e);
+    }
+  }, 600);
+}
+
+document.addEventListener('tracker-auth-ready', ()=>{
+  const saved = window.__trackerProfile && window.__trackerProfile.preferences && window.__trackerProfile.preferences.eventsGantt;
+  applyFilterPrefs(saved);
+  filterPrefsLoaded = true;
+  buildChips();
+  buildGradeChips();
+  render();
+});
+if (window.__trackerProfile) {
+  const saved = window.__trackerProfile.preferences && window.__trackerProfile.preferences.eventsGantt;
+  applyFilterPrefs(saved);
+  filterPrefsLoaded = true;
+}
+
 /* ===== Time helpers ===== */
 /* ===== Format merging (same as game-events.html) ===== */
 /* ===== Row packing: assign non-overlapping events to shared rows ===== */
@@ -451,6 +511,7 @@ function render(){
   if(!anyEventsAtAll){
     inner.innerHTML = '<div class="empty-note">No events match your filters in this 4-week range.</div>';
   }
+  saveFilterPrefs();
 }
 function startLabelFor(dISO){
   const [y,mo,d] = dISO.split('-').map(Number);
@@ -508,10 +569,14 @@ async function loadDataAndInit(){
   GAME_EVENTS = events;
 
   augmentCategoriesFromEvents(buildMergedEvents(GAME_EVENTS));
-  activeTypes = new Set(Object.keys(GAME_CATS));
-  // These are noisy/high-volume by default — start hidden, easy to turn back on
-  ['territory', 'battlepass', 'voyage'].forEach(k => activeTypes.delete(k));
-  ticketedVisible = false;
+  // Only apply the hardcoded defaults if a restore hasn't already happened — otherwise this
+  // would wipe out a restored selection whenever tracker-auth-ready fires before this completes.
+  if(!filterPrefsLoaded){
+    activeTypes = new Set(Object.keys(GAME_CATS));
+    // These are noisy/high-volume by default — start hidden, easy to turn back on
+    ['territory', 'battlepass', 'voyage'].forEach(k => activeTypes.delete(k));
+    ticketedVisible = false;
+  }
 
   buildTzSelect();
   buildChips();
