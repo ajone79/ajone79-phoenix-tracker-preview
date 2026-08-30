@@ -287,7 +287,10 @@
   <section class="block" id="overview">
     <h2>Arc Overview</h2>
     <div class="block-sub">What this arc is about, key mechanics, and timeline. Tap a card to view full size.</div>
-    <iframe id="patchNotesFrame" title="M94.1 Cause & Effect Mid Arc Patch Notes" loading="lazy" style="width:100%;border:0;border-radius:16px;display:none;margin-bottom:16px;min-height:400px;"></iframe>
+    <div id="patchNotesWrap" style="display:none;margin-bottom:16px;">
+      <iframe id="patchNotesFrame" title="M94.1 Cause & Effect Mid Arc Patch Notes" loading="lazy" style="width:100%;border:0;border-radius:16px;display:block;"></iframe>
+      <a id="patchNotesFullLink" href="#" target="_blank" rel="noopener" style="display:none;text-align:right;font-size:11px;color:var(--teal);text-decoration:none;margin-top:6px;">View full size ↗</a>
+    </div>
     <div class="gallery" id="overviewGallery"></div>
   </section>
 
@@ -412,9 +415,21 @@ loadTrivia();
 
 (function(){
   const f = document.getElementById('patchNotesFrame');
+  const fullLink = document.getElementById('patchNotesFullLink');
   if(!f) return;
+  const NARROW_MAX_HEIGHT = 480;
   function resize(){
-    try{ f.style.height = f.contentWindow.document.documentElement.scrollHeight + 'px'; }catch(e){}
+    try{
+      const fullHeight = f.contentWindow.document.documentElement.scrollHeight;
+      const isNarrow = window.innerWidth <= 700;
+      if(isNarrow && fullHeight > NARROW_MAX_HEIGHT){
+        f.style.height = NARROW_MAX_HEIGHT + 'px';
+        fullLink.style.display = 'block';
+      } else {
+        f.style.height = fullHeight + 'px';
+        fullLink.style.display = 'none';
+      }
+    }catch(e){}
   }
   f.addEventListener('load', () => { resize(); setTimeout(resize, 350); });
   window.addEventListener('resize', resize);
@@ -460,7 +475,8 @@ async function loadHomeContent(){
     const frame = document.getElementById('patchNotesFrame');
     if(c.patch_notes_url){
       frame.src = c.patch_notes_url;
-      frame.style.display = 'block';
+      document.getElementById('patchNotesWrap').style.display = 'block';
+      document.getElementById('patchNotesFullLink').href = c.patch_notes_url;
     }
   }catch(e){ console.error('loadHomeContent failed', e); }
 }
