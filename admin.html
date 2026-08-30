@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoenix EU168 — Access Admin</title>
+<meta name="description" content="Admin tools for Phoenix EU168 — approve members, manage roster sync, and configure events.">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-eu168.png">
+<link rel="apple-touch-icon" href="/icon-eu168.png">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/phx-nav-menu.js"></script>
+<style>
+  :root{--void:#050507;--panel:#111116;--panel-2:#17171e;--hair:#2a2a34;--signal:#ff9142;--periwinkle:#8fa3ff;--mint:#5fd068;--gold:#ffc857;--alert:#ff5a5f;--text:#e8e6e1;--text-dim:#8a8a94;--text-faint:#55555f;}
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--void);color:var(--text);font-family:'Space Mono',monospace;}
+  .topbar{display:flex;align-items:stretch;height:60px;}
+  .elbow{width:110px;background:var(--signal);border-bottom-left-radius:30px;display:flex;align-items:center;justify-content:flex-end;padding-right:14px;}
+  .elbow span{font-family:'Antonio',sans-serif;font-weight:700;color:var(--void);font-size:12px;letter-spacing:.08em;}
+  .topbar-bar{flex:1;background:var(--panel);display:flex;align-items:center;padding:0 22px;border-bottom:2px solid var(--hair);}
+  .topbar-title{font-family:'Antonio',sans-serif;font-weight:700;font-size:20px;letter-spacing:.05em;}
+  .topbar-title b{color:var(--signal);}
+  .phx-nav{
+    position:sticky; top:0; z-index:9999;
+    display:flex; align-items:center; gap:4px;
+    background:#0a0a0d; border-bottom:2px solid #f2a93b;
+    padding:0 14px; height:36px;
+    font-family:ui-monospace,'SF Mono','Consolas',monospace;
+    overflow-x:auto; white-space:nowrap;
+  }
+  .phx-nav .phx-nav-tag{
+    color:#f2a93b; font-weight:700; letter-spacing:.12em; font-size:11px;
+    margin-right:12px; flex-shrink:0;
+  }
+  .phx-nav a{
+    color:#9a9aa4; text-decoration:none; font-size:11px; letter-spacing:.06em;
+    text-transform:uppercase; padding:8px 12px; border-radius:0 0 6px 6px;
+    transition:color .15s ease, background .15s ease; flex-shrink:0;
+  }
+  .phx-nav a:hover{ color:#e8e6e1; background:rgba(255,255,255,.06); }
+  .phx-nav a.current{ color:#0a0a0d; background:#f2a93b; font-weight:700; }
+  main{padding:26px 30px 60px;max-width:980px;margin:0 auto;}
+  h2{font-family:'Antonio',sans-serif;font-size:16px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);margin:28px 0 12px;}
+  .row{background:var(--panel);border:1px solid var(--hair);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .row.pending{border-color:var(--gold);}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--panel-2);flex-shrink:0;object-fit:cover;}
+  .who{min-width:160px;}
+  .dname{font-weight:700;font-size:13px;}
+  .did{font-size:9.5px;color:var(--text-faint);}
+  input[type=text]{background:var(--panel-2);border:1px solid var(--hair);color:var(--text);font-family:'Space Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;flex:1;min-width:160px;}
+  .btn{font-family:'Antonio',sans-serif;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:11px;padding:8px 14px;border-radius:6px;border:none;cursor:pointer;}
+  .btn.approve{background:var(--mint);color:var(--void);}
+  .btn.revoke{background:transparent;border:1px solid var(--alert);color:var(--alert);}
+  .btn.save{background:var(--periwinkle);color:var(--void);}
+  .btn.admin{background:transparent;border:1px solid var(--gold);color:var(--gold);}
+  .tag{font-size:9px;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em;}
+  .tag.approved{background:rgba(95,208,104,.15);color:var(--mint);}
+  .tag.pending{background:rgba(255,200,87,.15);color:var(--gold);}
+  .tag.admintag{background:rgba(255,200,87,.2);color:var(--gold);border:1px solid var(--gold);}
+  .allowlist-banner{background:rgba(255,200,87,.08);border:1px solid var(--gold);border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:11.5px;}
+  .allowlist-banner b{color:var(--gold);}
+  .allow-chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--hair);border-radius:20px;padding:3px 10px 3px 10px;margin:4px 6px 0 0;font-size:11px;}
+  .allow-chip.matched{border-color:var(--mint);color:var(--mint);}
+  .allow-chip.waiting{color:var(--text-faint);}
+  .empty{color:var(--text-faint);font-size:12px;padding:20px 0;}
+  .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;}
+  .gate-box{max-width:400px;text-align:center;padding:30px;}
+  .import-box{background:var(--panel);border:1px solid var(--hair);border-radius:10px;padding:18px 20px;margin-bottom:10px;}
+  .import-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .field-group{display:flex;flex-direction:column;gap:3px;}
+  .field-label{font-size:9.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;}
+  select, input[type=file]{background:var(--panel-2);border:1px solid var(--hair);color:var(--text);font-family:'Space Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;}
+  .btn.extract{background:var(--signal);color:var(--void);}
+  .btn.save-all{background:var(--mint);color:var(--void);}
+  .btn.force{background:transparent;border:1px solid var(--alert);color:var(--alert);padding:4px 10px;font-size:9.5px;}
+  .review-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11.5px;}
+  .review-table th{text-align:left;color:var(--text-faint);font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--hair);}
+  .review-table td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;}
+  .review-table tr.flagged{background:rgba(255,90,95,.07);}
+  .review-table tr.nomatch{background:rgba(255,200,87,.07);}
+  .review-table tr.fuzzymatch{background:rgba(143,163,255,.06);}
+  .review-table input[type=text], .review-table input[type=number]{width:100%;min-width:80px;}
+  .review-table select{width:100%;min-width:150px;}
+  .flag-note{font-size:9.5px;color:var(--alert);margin-top:2px;}
+  .fuzzy-note{font-size:9.5px;color:var(--periwinkle);margin-top:2px;}
+  .import-status{font-size:11px;color:var(--text-dim);margin-top:8px;}
+  .import-status.err{color:var(--alert);}
+  .import-status.ok{color:var(--mint);}
+  .stitch-gallery{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+  .stitch-thumb{position:relative;width:130px;border:1px solid var(--hair);border-radius:8px;overflow:hidden;background:var(--panel-2);}
+  .stitch-thumb img{width:100%;display:block;max-height:220px;object-fit:cover;object-position:top;}
+  .stitch-thumb .lbl{font-size:9px;color:var(--text-faint);padding:3px 6px;}
+  .stitch-thumb .rm{position:absolute;top:4px;right:4px;background:rgba(10,10,13,.85);border:1px solid var(--alert);color:var(--alert);width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:11px;line-height:1;}
+</style>
+</head>
+<body>
+<div id="app"><div class="gate"><div class="gate-box">Loading…</div></div></div>
+
+<script>
+const SUPABASE_URL = 'https://mmzizgsanwqjpiumpqay.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1teml6Z3NhbndxanBpdW1wcWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjk5MzksImV4cCI6MjEwMTYwNTkzOX0.KqvY2Ib33J8h8ztEi8qxtfutSdVIPAaJRtj7cSUSKFM';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+let profiles = [];
+let roster = [];
+let allowlist = [];
+let events = [];
+let arcs = [];
+let reviewQueue = [];
+let me = null;
+let mySession = null;
+
+let extractedRows = []; // {name, score, playerId, existingScore}
+let extractStatus = { loading: false, message: '', kind: '' };
+let guideOpen = false;
+let thresholdsOpen = false;
+let stitchedPreviews = []; // {id, dataUrl, sourceCount}
+let screensPerStitch = 5;
+let selectedEventId = '';
+let batchStatuses = []; // {label, state, message}  -- legacy, no longer used for sending but kept harmless
+let pendingDeleteEventId = null;
+let activeJob = null;
+let jobPollTimer = null;
+
+function eventThresholdRowHtml(e){
+  const isPendingDelete = pendingDeleteEventId === e.id;
+  return `
+    <tr data-eventrow="${e.id}">
+      <td>${escapeHtml(e.name)} <span style="color:var(--text-faint)">(${e.date})</span></td>
+      <td>
+        <select data-scoringtypeinput="${e.id}">
+          <option value="score" ${e.scoring_type==='score'?'selected':''}>Score-based</option>
+          <option value="tasks" ${e.scoring_type==='tasks'?'selected':''}>Task count</option>
+        </select>
+      </td>
+      <td>
+        <select data-completionmodeinput="${e.id}">
+          <option value="average" ${(!e.completion_mode || e.completion_mode==='average')?'selected':''}>Average / percentile</option>
+          <option value="threshold" ${e.completion_mode==='threshold'?'selected':''}>Threshold (pass/fail)</option>
+        </select>
+      </td>
+      <td><input type="number" data-thresholdinput="${e.id}" value="${e.threshold ?? ''}"></td>
+      <td><button class="btn save" data-savethreshold="${e.id}">Save</button></td>
+      <td>${isPendingDelete
+        ? `<button class="btn force" data-confirmdelete="${e.id}" style="background:var(--alert);color:var(--void);">⚠ Confirm delete?</button> <button class="btn admin" data-canceldelete="${e.id}">Cancel</button>`
+        : `<button class="btn force" data-deleteevent="${e.id}">Delete</button>`}
+      </td>
+    </tr>
+  `;
+}
+
+function rerenderThresholdsTable(){
+  document.querySelector('#eventThresholdsTable tbody').innerHTML = events.map(e => eventThresholdRowHtml(e)).join('');
+  wireThresholdsTable();
+}
+
+function wireThresholdsTable(){
+  document.querySelectorAll('[data-savethreshold]').forEach(b => b.addEventListener('click', async () => {
+    const eventId = b.dataset.savethreshold;
+    const thresholdInput = document.querySelector(`[data-thresholdinput="${eventId}"]`);
+    const scoringTypeInput = document.querySelector(`[data-scoringtypeinput="${eventId}"]`);
+    const completionModeInput = document.querySelector(`[data-completionmodeinput="${eventId}"]`);
+    const val = thresholdInput.value === '' ? null : parseInt(thresholdInput.value);
+    const { error } = await sb.from('events').update({
+      threshold: val,
+      scoring_type: scoringTypeInput.value,
+      completion_mode: completionModeInput.value,
+      updated_at: new Date().toISOString()
+    }).eq('id', eventId);
+    if (error) { alert(`Error saving: ${error.message}`); return; }
+    const ev = events.find(e => e.id === eventId);
+    if (ev) { ev.threshold = val; ev.scoring_type = scoringTypeInput.value; ev.completion_mode = completionModeInput.value; }
+    b.textContent = 'Saved ✓';
+    setTimeout(() => { b.textContent = 'Save'; }, 1500);
+  }));
+  document.querySelectorAll('[data-deleteevent]').forEach(b => b.addEventListener('click', () => {
+    pendingDeleteEventId = b.dataset.deleteevent;
+    rerenderThresholdsTable();
+  }));
+  document.querySelectorAll('[data-canceldelete]').forEach(b => b.addEventListener('click', () => {
+    pendingDeleteEventId = null;
+    rerenderThresholdsTable();
+  }));
+  document.querySelectorAll('[data-confirmdelete]').forEach(b => b.addEventListener('click', async () => {
+    const eventId = b.dataset.confirmdelete;
+    b.textContent = 'Deleting…';
+    b.disabled = true;
+    const { error } = await sb.from('events').delete().eq('id', eventId);
+    if (error) { alert(`Delete failed: ${error.message}`); pendingDeleteEventId = null; rerenderThresholdsTable(); return; }
+    events = events.filter(e => e.id !== eventId);
+    if (selectedEventId === eventId) selectedEventId = '';
+    pendingDeleteEventId = null;
+    rerenderThresholdsTable();
+    refreshImportSectionOnly();
+  }));
+}
+
+async function init(){
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { location.href = 'login.html?next=admin.html'; return; }
+  mySession = session;
+
+  let { data: myProfile } = await sb.from('tracker_profiles').select('*').eq('id', session.user.id).maybeSingle();
+  if (!myProfile || !myProfile.is_admin) {
+    document.getElementById('app').innerHTML = `<div class="gate"><div class="gate-box"><h2 style="color:#ff5a5f">Not authorized</h2><p style="color:#8a8a94;font-size:12px;">This page is for alliance admins only.</p><a href="index.html" style="color:#ff9142;">← Back to tracker</a></div></div>`;
+    return;
+  }
+  me = myProfile;
+  await loadData();
+  await checkForActiveJob();
+  render();
+}
+
+async function loadData(){
+  const [{data:p}, {data:r}, {data:a}, {data:e}, {data:ar}, {data:rq}] = await Promise.all([
+    sb.from('tracker_profiles').select('*').order('approved', {ascending:true}).order('created_at', {ascending:false}),
+    sb.from('roster').select('id,name,level').order('name'),
+    sb.from('tracker_admin_allowlist').select('*').order('in_game_name'),
+    sb.from('events').select('id,name,date,arc_id,scoring_type,completion_mode,threshold,is_test').order('date', {ascending:false}),
+    sb.from('arcs').select('id,name,status').order('end_date', {ascending:false}),
+    sb.from('roster_sync_review').select('*').eq('resolved', false).order('created_at', {ascending:false})
+  ]);
+  profiles = p || [];
+  roster = r || [];
+  allowlist = a || [];
+  events = e || [];
+  arcs = ar || [];
+  reviewQueue = rq || [];
+}
+
+function nextRosterId(){
+  const nums = roster.map(r => {
+    const m = /^p(\d+)$/.exec(r.id);
+    return m ? parseInt(m[1], 10) : 0;
+  });
+  const max = nums.length ? Math.max(...nums) : 0;
+  return 'p' + (max + 1);
+}
+
+function reviewQueueRowHtml(r){
+  const when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB', {day:'2-digit', month:'short'}) : '';
+  if(r.review_type === 'new_member'){
+    return `<tr>
+      <td><span class="tag" style="background:var(--mint);color:var(--void);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;">NEW</span></td>
+      <td>${escapeHtml(r.scraped_name || '')}</td>
+      <td>Level ${r.scraped_level ?? '?'}</td>
+      <td style="color:var(--text-faint);font-size:10px;">${when}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn save" data-addmember="${r.id}">Add to roster</button>
+        <button class="btn" data-dismissreview="${r.id}">Dismiss</button>
+      </td>
+    </tr>`;
+  }
+  if(r.review_type === 'possibly_left'){
+    return `<tr>
+      <td><span class="tag" style="background:var(--gold);color:var(--void);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;">LEFT?</span></td>
+      <td>${escapeHtml(r.previous_name || '')}</td>
+      <td style="color:var(--text-dim);font-size:10.5px;">${escapeHtml(r.detail || '')}</td>
+      <td style="color:var(--text-faint);font-size:10px;">${when}</td>
+      <td style="white-space:nowrap;">
+        ${r.roster_id ? `<button class="btn admin" data-markinactive="${r.id}" data-rosterid="${r.roster_id}">Mark inactive</button>` : ''}
+        <button class="btn" data-dismissreview="${r.id}">Dismiss</button>
+      </td>
+    </tr>`;
+  }
+  if(r.review_type === 'rename'){
+    return `<tr>
+      <td><span class="tag" style="background:var(--periwinkle);color:var(--void);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;">RENAME</span></td>
+      <td>${escapeHtml(r.previous_name || '')} → ${escapeHtml(r.scraped_name || '')}</td>
+      <td style="color:var(--text-dim);font-size:10.5px;">${escapeHtml(r.detail || 'Applied automatically.')}</td>
+      <td style="color:var(--text-faint);font-size:10px;">${when}</td>
+      <td style="white-space:nowrap;"><button class="btn" data-dismissreview="${r.id}">Dismiss</button></td>
+    </tr>`;
+  }
+  return '';
+}
+
+async function addMemberFromReview(reviewId){
+  const row = reviewQueue.find(r => r.id === reviewId);
+  if(!row) return;
+  const newId = nextRosterId();
+  const { error: insertErr } = await sb.from('roster').insert({
+    id: newId,
+    name: row.scraped_name,
+    level: row.scraped_level,
+    status: 'active',
+    stfc_player_id: row.stfc_player_id
+  });
+  if(insertErr){ alert(`Error adding to roster: ${insertErr.message}`); return; }
+  const { error: resolveErr } = await sb.from('roster_sync_review').update({resolved:true}).eq('id', reviewId);
+  if(resolveErr){ alert(`Added to roster (as ${newId}), but failed to clear the review flag: ${resolveErr.message}`); }
+  await loadData();
+  render();
+}
+
+async function markInactiveFromReview(reviewId, rosterId){
+  const { error: updErr } = await sb.from('roster').update({status:'inactive'}).eq('id', rosterId);
+  if(updErr){ alert(`Error updating roster: ${updErr.message}`); return; }
+  await sb.from('roster_sync_review').update({resolved:true}).eq('id', reviewId);
+  await loadData();
+  render();
+}
+
+async function dismissReview(reviewId){
+  await sb.from('roster_sync_review').update({resolved:true}).eq('id', reviewId);
+  await loadData();
+  render();
+}
+
+function render(){
+  const pending = profiles.filter(p=>!p.approved);
+  const approved = profiles.filter(p=>p.approved);
+
+  const allowChips = allowlist.map(a => {
+    const match = profiles.find(p => (p.in_game_name||'').trim().toLowerCase() === a.in_game_name.trim().toLowerCase());
+    if (match && match.is_admin) return `<span class="allow-chip matched">✓ ${escapeHtml(a.in_game_name)} — admin</span>`;
+    if (match) return `<span class="allow-chip matched">${escapeHtml(a.in_game_name)} — linked, not admin yet <button class="btn admin" style="padding:2px 8px;font-size:9px;" data-admintoggle="${match.id}" data-current="false">Make admin</button></span>`;
+    return `<span class="allow-chip waiting">${escapeHtml(a.in_game_name)} — hasn't logged in yet</span>`;
+  }).join('');
+
+  document.getElementById('app').innerHTML = `
+    <nav class="phx-nav"><span class="phx-nav-tag">PHX</span><a href="index.html">🏠 Home</a><a href="admin.html" class="current">🛠️ Admin</a></nav>
+    <div class="topbar">
+      <div class="elbow"><span>PHX</span></div>
+      <div class="topbar-bar"><div class="topbar-title"><b>PHOENIX</b> EU168 — ACCESS ADMIN</div></div>
+    </div>
+    <main>
+      <p style="font-size:11.5px;color:#8a8a94;">Signed in as <b>${escapeHtml(me.discord_username)}</b>. Approve pending Discord logins below and, since Discord names rarely match in-game names, type the correct in-game name next to each person yourself — matching this list against the roster.</p>
+
+      ${reviewQueue.length > 0 ? `
+      <h2>🔔 Roster Sync Review (${reviewQueue.length})</h2>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;">Flagged automatically by the stfc.pro sync every 6 hours — new/unmatched players, possible departures, and low-confidence name matches. Renames are applied automatically already (shown here just for your audit trail); everything else waits for you to act.</div>
+      <div style="background:var(--panel);border:1px solid var(--hair);border-radius:10px;padding:0;overflow:auto;margin-bottom:24px;">
+      <table class="review-table">
+        <thead><tr><th>Type</th><th>Player</th><th>Detail</th><th>When</th><th></th></tr></thead>
+        <tbody>${reviewQueue.map(reviewQueueRowHtml).join('')}</tbody>
+      </table>
+      </div>
+      ` : ''}
+
+      <button class="btn admin" id="guideToggle" style="margin-bottom:10px;">📖 How to use this page ${guideOpen ? '(hide)' : '(show)'}</button>
+      <div id="guideBox" style="${guideOpen ? '' : 'display:none;'}background:var(--panel);border:1px solid var(--hair);border-radius:10px;padding:16px 20px;margin-bottom:18px;font-size:11.5px;color:var(--text-dim);line-height:1.7;">
+        <b style="color:var(--signal);">Approving new members</b><br>
+        When someone signs in with Discord for the first time, they show up under "Pending approval" (right at the top of this page) with just a Discord name. Type their real in-game name into the box next to their row (check it against the roster if unsure), then hit <b>Approve</b>. They don't need to log in again — access takes effect immediately.<br><br>
+
+        <b style="color:var(--signal);">Making someone an admin</b><br>
+        The "Intended admins" banner lists who's supposed to get admin rights. Once one of them has logged in and you've filled in their in-game name, a "Make admin" button appears next to their name in that banner — click it. You can also promote/demote anyone from the Approved members list using the Admin / Remove admin buttons. Note: the account owner's row is protected — it can't be revoked or demoted by anyone, even by accident, at the database level.<br><br>
+
+        <b style="color:var(--signal);">Creating a new event</b><br>
+        Click <b>"Or create a new event and add scores"</b> next to the event dropdown. Fill in a name, date, and which arc it belongs to (defaults to whichever arc is currently active — this controls whether it shows up in the IDIQ-scoped tabs on the tracker, not just Overall Completion). You must explicitly choose both:
+        <ul style="margin:6px 0 6px 18px;padding:0;">
+          <li><b>Scoring type</b> — Score-based (a raw number) or Task count.</li>
+          <li><b>Completion mode</b> — Average/percentile (players ranked and colour-coded against each other) or Threshold (pass/fail against a single line).</li>
+        </ul>
+        These are independent settings — creation is blocked until both are picked, there's no default. Tick <b>"Test event"</b> to keep testing/demo events out of Overall Completion too, not just the IDIQ tabs.<br><br>
+
+        <b style="color:var(--signal);">Editing or deleting an existing event</b><br>
+        Click <b>"Manage event thresholds"</b> to expand it (collapsed by default). Every event has editable Scoring Type, Completion Mode, and Threshold dropdowns/fields right there — if someone picked the wrong metric on a live event, fix it and hit Save; no need to delete and recreate it. <b>Delete</b> asks for a second confirmation click before it actually happens, and automatically removes any scores logged against that event too.<br><br>
+
+        <b style="color:var(--signal);">Importing scores from a screenshot</b><br>
+        1. Pick the event, then choose your screenshots of the in-game leaderboard — any number at once.<br>
+        2. Set <b>"Screens per stitched image"</b> if you want (defaults to 5 — the most Groq can reliably read in one go). Click <b>Preview stitched image(s)</b>. This builds the combined images entirely in your browser first — nothing is sent anywhere yet. You'll see a thumbnail per batch ("Batch 1", "Batch 2"...); remove any that look bad with the ✕, or change the screens-per-image number and preview again.<br>
+        3. When it looks right, click <b>Send to Groq</b>. This starts a <b>background job on the server</b> — it is completely safe to close this tab, lock your phone, or navigate elsewhere. Progress is paced roughly a minute apart per batch (Groq's free tier resets its usage allowance once a minute, and a single stitched image can already use most of it), and retries automatically if rate-limited.<br>
+        4. While a job is running, come back to this page any time and it picks up right where it left off — live status per batch ("Sending in 42s…", "Done — 14 rows"), with a "Check now" button to refresh immediately, or "Cancel job" if you need to stop it.<br>
+        5. <b>If a batch fails even after retrying, nothing is added to the review table</b> — this is intentional, so you never end up with an incomplete set of scores without realising it. Use <b>"Retry failed batch"</b> to pick back up from that exact point (no need to re-upload anything), or "Discard job" to abandon it and start over.<br>
+        6. Once the job finishes, click <b>"Load N row(s) into review table"</b> — this is a manual step on purpose, nothing gets written to Supabase until you do this.<br>
+        7. The same player often shows up twice in one screenshot (their own row usually stays pinned on screen regardless of scroll position) — these duplicates are automatically detected and removed, both by Groq itself and again as a backup check on this page.<br>
+        8. <b>Always check the review table before saving.</b> Every extracted name is matched against the roster automatically: an exact or clearly-contained match needs no attention, but a <span style="color:var(--periwinkle)">blue-tinted row with an "⚠ auto-matched — please verify" note</span> means the closest-sounding roster name was picked automatically since nothing matched exactly — double check these, they're usually right but worth a glance. An amber row with an empty dropdown means no match was found at all and needs picking manually. Scores are editable if anything looks misread.<br>
+        9. Rows highlighted <span style="color:var(--alert)">red</span> have a new score lower than what's already stored for that player — these are excluded from the bulk save on purpose (protects against accidentally overwriting a correct score with a bad screenshot read). If the new value is genuinely correct, use that row's <b>Save anyway</b> button.<br>
+        10. <b>Save all checked (non-flagged)</b> writes everything else straight into the scores table and shows a green confirmation banner. Only the rows that actually got saved disappear from the table — anything skipped (unchecked, flagged, unmatched) stays visible so nothing gets lost. <b>Clear all rows</b> wipes the table completely if you want to start fresh.
+      </div>
+
+      <div class="allowlist-banner"><b>Intended admins:</b><br>${allowChips}</div>
+
+      <h2>Pending approval (${pending.length})</h2>
+      <div id="pendingList">${pending.length ? pending.map(rowHtml).join('') : '<div class="empty">Nobody waiting.</div>'}</div>
+
+      <h2>Import scores from screenshot</h2>
+      <div id="importBoxWrap">${importSectionHtml()}</div>
+
+      <button class="btn admin" id="thresholdsToggle" style="margin:18px 0 4px;">Manage event thresholds ${thresholdsOpen ? '▲ (hide)' : '▼ (show)'}</button>
+      <div id="thresholdsBox" style="${thresholdsOpen ? '' : 'display:none;'}">
+        <div class="import-box">
+          <table class="review-table" id="eventThresholdsTable">
+            <thead><tr><th>Event</th><th>Scoring Type</th><th>Completion Mode</th><th>Threshold</th><th></th><th></th></tr></thead>
+            <tbody>
+              ${events.map(e => eventThresholdRowHtml(e)).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="import-box" style="margin:18px 0 4px;">
+        <div style="font-size:12px;color:var(--text-dim);">
+          ⚙️ AJ worked some magic — player names and levels now auto-update from stfc.pro every 6 hours. No manual editing needed here anymore.
+        </div>
+      </div>
+
+      <h2>Approved members (${approved.length})</h2>
+      <div id="approvedList">${approved.length ? approved.map(rowHtml).join('') : '<div class="empty">No approved members yet.</div>'}</div>
+    </main>
+  `;
+
+  document.querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click', ()=>setApproved(b.dataset.approve, true)));
+  document.querySelectorAll('[data-revoke]').forEach(b=>b.addEventListener('click', ()=>setApproved(b.dataset.revoke, false)));
+  document.querySelectorAll('[data-save]').forEach(b=>b.addEventListener('click', ()=>saveName(b.dataset.save)));
+  document.querySelectorAll('[data-admintoggle]').forEach(b=>b.addEventListener('click', ()=>toggleAdmin(b.dataset.admintoggle, b.dataset.current==='true')));
+
+  document.querySelectorAll('[data-addmember]').forEach(b=>b.addEventListener('click', ()=>addMemberFromReview(b.dataset.addmember)));
+  document.querySelectorAll('[data-markinactive]').forEach(b=>b.addEventListener('click', ()=>markInactiveFromReview(b.dataset.markinactive, b.dataset.rosterid)));
+  document.querySelectorAll('[data-dismissreview]').forEach(b=>b.addEventListener('click', ()=>dismissReview(b.dataset.dismissreview)));
+
+  wireImportSection();
+
+  const guideToggle = document.getElementById('guideToggle');
+  if (guideToggle) guideToggle.addEventListener('click', () => {
+    guideOpen = !guideOpen;
+    const box = document.getElementById('guideBox');
+    box.style.display = guideOpen ? '' : 'none';
+    guideToggle.textContent = `📖 How to use this page ${guideOpen ? '(hide)' : '(show)'}`;
+  });
+
+  const thresholdsToggle = document.getElementById('thresholdsToggle');
+  if (thresholdsToggle) thresholdsToggle.addEventListener('click', () => {
+    thresholdsOpen = !thresholdsOpen;
+    const box = document.getElementById('thresholdsBox');
+    box.style.display = thresholdsOpen ? '' : 'none';
+    thresholdsToggle.textContent = `Manage event thresholds ${thresholdsOpen ? '▲ (hide)' : '▼ (show)'}`;
+  });
+
+  wireThresholdsTable();
+
+  if (window.__phxInitNavMenu) window.__phxInitNavMenu();
+}
+
+function rowHtml(p){
+  const providerBadge = p.login_provider && p.login_provider !== 'discord'
+    ? `<span class="tag" style="border-color:var(--periwinkle);color:var(--periwinkle);">via ${escapeHtml(p.login_provider)}</span>`
+    : '';
+  if (p.is_owner) {
+    return `
+      <div class="row">
+        ${p.avatar_url ? `<img class="avatar" src="${escapeHtml(p.avatar_url)}">` : '<div class="avatar"></div>'}
+        <div class="who">
+          <div class="dname">${escapeHtml(p.discord_username||'Unknown')}</div>
+          <div class="did">${escapeHtml(p.discord_id||'')}</div>
+        </div>
+        <input type="text" placeholder="In-game name" value="${escapeHtml(p.in_game_name||'')}" data-nameinput="${p.id}">
+        <button class="btn save" data-save="${p.id}">Save</button>
+        <span class="tag approved">Approved</span>
+        ${providerBadge}
+        <span class="tag admintag" style="border-color:var(--gold);color:var(--gold);">👑 Owner — protected</span>
+      </div>
+    `;
+  }
+  return `
+    <div class="row ${p.approved?'':'pending'}">
+      ${p.avatar_url ? `<img class="avatar" src="${escapeHtml(p.avatar_url)}">` : '<div class="avatar"></div>'}
+      <div class="who">
+        <div class="dname">${escapeHtml(p.discord_username||'Unknown')}</div>
+        <div class="did">${escapeHtml(p.discord_id||'')}</div>
+      </div>
+      <input type="text" placeholder="In-game name" value="${escapeHtml(p.in_game_name||'')}" data-nameinput="${p.id}">
+      <button class="btn save" data-save="${p.id}">Save</button>
+      ${p.approved
+        ? `<span class="tag approved">Approved</span><button class="btn revoke" data-revoke="${p.id}">Revoke</button>`
+        : `<span class="tag pending">Pending</span><button class="btn approve" data-approve="${p.id}">Approve</button>`}
+      ${providerBadge}
+      ${p.is_admin ? '<span class="tag admintag">Admin</span>' : ''}
+      <button class="btn admin" data-admintoggle="${p.id}" data-current="${!!p.is_admin}">${p.is_admin?'Remove admin':'Make admin'}</button>
+    </div>
+  `;
+}
+
+async function setApproved(id, val){
+  await sb.from('tracker_profiles').update({approved: val, updated_at: new Date().toISOString()}).eq('id', id);
+  await loadData(); render();
+}
+async function toggleAdmin(id, current){
+  await sb.from('tracker_profiles').update({is_admin: !current, updated_at: new Date().toISOString()}).eq('id', id);
+  await loadData(); render();
+}
+async function saveName(id){
+  const input = document.querySelector(`[data-nameinput="${id}"]`);
+  await sb.from('tracker_profiles').update({in_game_name: input.value, updated_at: new Date().toISOString()}).eq('id', id);
+  await loadData(); render();
+}
+
+// ==================== Score import from screenshot ====================
+
+function normalizeName(s){
+  return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+}
+
+function levenshtein(a, b){
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({length: m+1}, () => new Array(n+1).fill(0));
+  for (let i=0;i<=m;i++) dp[i][0]=i;
+  for (let j=0;j<=n;j++) dp[0][j]=j;
+  for (let i=1;i<=m;i++){
+    for (let j=1;j<=n;j++){
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Returns { playerId, confidence } where confidence is 'exact' | 'substring' | 'fuzzy' | null.
+// With a roster this small (~90 distinct names), the nearest edit-distance match is almost
+// always correct even for fairly mangled OCR reads -- so we always surface the closest
+// candidate rather than giving up, but flag anything short of an exact match for a human check.
+function bestRosterMatch(extractedName){
+  const norm = normalizeName(extractedName);
+  if (!norm) return { playerId: null, confidence: null };
+
+  const exact = roster.find(r => normalizeName(r.name) === norm);
+  if (exact) return { playerId: exact.id, confidence: 'exact' };
+
+  const contains = roster.find(r => normalizeName(r.name).includes(norm) || norm.includes(normalizeName(r.name)));
+  if (contains) return { playerId: contains.id, confidence: 'substring' };
+
+  let best = null, bestDist = Infinity;
+  for (const r of roster) {
+    const rn = normalizeName(r.name);
+    if (!rn) continue;
+    const d = levenshtein(norm, rn);
+    if (d < bestDist) { bestDist = d; best = r; }
+  }
+  if (best) return { playerId: best.id, confidence: 'fuzzy', distance: bestDist };
+  return { playerId: null, confidence: null };
+}
+
+function importSectionHtml(){
+  return `
+    <div class="import-box">
+      <div class="import-row">
+        <label style="font-size:11px;color:#8a8a94;">Event:</label>
+        <select id="importEventSelect">
+          <option value="">— pick an event to update existing scores —</option>
+          ${events.map(e=>`<option value="${e.id}" ${e.id===selectedEventId?'selected':''}>${escapeHtml(e.name)} (${e.date})</option>`).join('')}
+        </select>
+        <button class="btn admin" id="newEventToggle" type="button">Or create a new event and add scores</button>
+      </div>
+      <div class="import-row" id="newEventForm" style="display:none;background:var(--panel-2);border:1px solid var(--hair);border-radius:8px;padding:12px;">
+        <div class="field-group">
+          <label class="field-label">Event name</label>
+          <input type="text" id="newEventName" placeholder="e.g. Sector Strike - ALB" style="min-width:220px;">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Event date</label>
+          <input type="date" id="newEventDate">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Select current arc</label>
+          <select id="newEventArc">
+            ${arcs.map(a=>`<option value="${a.id}" ${a.status==='active'?'selected':''}>${escapeHtml(a.name)}${a.status==='active'?' (active)':''}</option>`).join('')}
+            <option value="">— no arc (won't show in IDIQ tabs) —</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Choose scoring type</label>
+          <select id="newEventScoringType">
+            <option value="">— please select —</option>
+            <option value="score">Score-based</option>
+            <option value="tasks">Task count</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Choose completion mode</label>
+          <select id="newEventCompletionMode">
+            <option value="">— please select —</option>
+            <option value="average">Average / percentile</option>
+            <option value="threshold">Threshold (pass/fail)</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Threshold (optional)</label>
+          <input type="number" id="newEventThreshold" placeholder="e.g. 10000" style="min-width:160px;">
+        </div>
+        <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:5px;margin-top:6px;"><input type="checkbox" id="newEventIsTest"> Test event (excluded from Overall Completion too)</label>
+        <button class="btn save-all" id="createEventBtn" type="button" style="margin-top:8px;">Create event</button>
+        <span id="newEventStatus" style="font-size:10.5px;color:var(--text-dim);"></span>
+        <div style="width:100%;font-size:9.5px;color:var(--text-faint);margin-top:8px;">
+          <b>Scoring type</b> is what kind of number goes into the scores table (a raw score, or a task count).
+          <b>Completion mode</b> is separately how that number gets colour-coded on the tracker — ranked against other players (average/percentile) or measured against a single pass/fail line (threshold). These are independent settings, which is why there are two dropdowns.
+          Threshold sets that pass/fail line, or the target used for colour-coding — leave blank to use the site default.
+          Arc controls whether this shows up in the IDIQ-scoped tabs — it defaults to whichever arc is currently active.
+        </div>
+      </div>
+
+      ${activeJob ? activeJobHtml() : `
+        <div class="import-row">
+          <input type="file" id="importFiles" accept="image/*" multiple>
+        </div>
+        <div class="import-row" style="font-size:11px;color:#8a8a94;">
+          <label>Screens per stitched image:</label>
+          <input type="number" id="screensPerStitchInput" value="${screensPerStitch}" min="1" max="15" style="width:60px;">
+          <button class="btn extract" id="previewBtn">Preview stitched image(s)</button>
+        </div>
+        <div class="import-status ${extractStatus.kind}" id="importStatus">${escapeHtml(extractStatus.message)}</div>
+        <div style="font-size:9.5px;color:var(--text-faint);margin-top:2px;">Preview builds stitched images locally first — nothing is sent to Groq until you confirm. Once sent, it runs as a background job on the server — safe to close this tab, lock your phone, or come back later.</div>
+        <div class="stitch-gallery" id="stitchGallery">${stitchedPreviews.length ? stitchGalleryHtml() : ''}</div>
+        ${stitchedPreviews.length ? `<div class="import-row" style="margin-top:10px;"><button class="btn save-all" id="sendToGroqBtn">Send ${stitchedPreviews.length} batch(es) to Groq</button><button class="btn force" id="clearPreviewBtn">Discard previews</button></div>` : ''}
+      `}
+
+      <div id="saveSuccessBanner" style="display:none;align-items:flex-start;gap:12px;background:rgba(95,208,104,.1);border:1px solid var(--mint);border-radius:10px;padding:14px 16px;margin-top:10px;"></div>
+      <div id="reviewWrap">${extractedRows.length ? reviewTableHtml() : ''}</div>
+    </div>
+  `;
+}
+
+function activeJobHtml(){
+  if (!activeJob) return '';
+  const batches = activeJob.batches || [];
+  const colorFor = s => s==='error' ? 'var(--alert)' : s==='done' ? 'var(--mint)' : (s==='sending'||s==='waiting') ? 'var(--signal)' : 'var(--text-dim)';
+  const rowsHtml = batches.map((b,i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:11.5px;">
+      <span style="width:70px;flex-shrink:0;color:var(--signal);font-weight:700;">Batch ${i+1}</span>
+      <span style="color:${colorFor(b.status)};">${escapeHtml(b.message || b.status || 'queued')}</span>
+    </div>
+  `).join('');
+
+  const eventName = escapeHtml((events.find(e=>e.id===activeJob.event_id)||{}).name || activeJob.event_id || '');
+  let footer = '';
+  if (activeJob.status === 'processing') {
+    footer = `
+      <div style="font-size:10px;color:var(--text-faint);margin-top:8px;">Running on the server — safe to close this tab, lock your phone, or come back later. Checks in every few seconds while this page is open.</div>
+      <div class="import-row" style="margin-top:10px;">
+        <button class="btn admin" id="jobRefreshBtn">Check now</button>
+        <button class="btn force" id="jobCancelBtn">Cancel job</button>
+      </div>`;
+  } else if (activeJob.status === 'done') {
+    const n = (activeJob.result_rows || []).length;
+    footer = `<div class="import-row" style="margin-top:10px;"><button class="btn save-all" id="jobLoadBtn">Load ${n} row(s) into review table</button></div>`;
+  } else if (activeJob.status === 'error') {
+    footer = `
+      <div class="flag-note" style="margin-top:6px;">${escapeHtml(activeJob.error_message || 'Job failed.')}</div>
+      <div class="import-row" style="margin-top:10px;">
+        <button class="btn save-all" id="jobRetryBtn">Retry failed batch</button>
+        <button class="btn force" id="jobDiscardBtn">Discard job</button>
+      </div>`;
+  }
+
+  return `<div class="import-box" style="margin-top:4px;border-color:${activeJob.status==='error'?'var(--alert)':activeJob.status==='done'?'var(--mint)':'var(--hair)'};">
+    <div style="font-weight:700;margin-bottom:8px;">Import job — ${eventName}</div>
+    ${rowsHtml}
+    ${footer}
+  </div>`;
+}
+
+async function checkForActiveJob(){
+  const { data } = await sb.from('import_jobs')
+    .select('*')
+    .eq('created_by', mySession.user.id)
+    .eq('dismissed', false)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  activeJob = data || null;
+  if (activeJob && activeJob.status === 'processing') startJobPolling();
+}
+
+function startJobPolling(){
+  stopJobPolling();
+  jobPollTimer = setInterval(pollActiveJob, 6000);
+}
+function stopJobPolling(){
+  if (jobPollTimer) { clearInterval(jobPollTimer); jobPollTimer = null; }
+}
+
+async function pollActiveJob(){
+  if (!activeJob) { stopJobPolling(); return; }
+  const { data } = await sb.from('import_jobs').select('*').eq('id', activeJob.id).maybeSingle();
+  if (!data) { activeJob = null; stopJobPolling(); refreshImportSectionOnly(); return; }
+  activeJob = data;
+  if (activeJob.status !== 'processing') stopJobPolling();
+  refreshImportSectionOnly();
+}
+
+async function handleLoadJobResults(){
+  if (!activeJob || activeJob.status !== 'done') return;
+  const eventId = activeJob.event_id;
+  const { data: existing } = await sb.from('scores').select('player_id,score').eq('event_id', eventId);
+  const existingMap = {};
+  (existing||[]).forEach(s => existingMap[s.player_id] = s.score);
+
+  const rows = activeJob.result_rows || [];
+  extractedRows = extractedRows.concat(rows.map(r => {
+    const match = bestRosterMatch(r.name);
+    return {
+      name: r.name,
+      score: parseInt(r.score) || 0,
+      playerId: match.playerId,
+      matchConfidence: match.confidence,
+      existingScore: match.playerId ? (existingMap[match.playerId] ?? null) : null,
+      include: true,
+      eventId
+    };
+  }));
+
+  await sb.from('import_jobs').update({ dismissed: true }).eq('id', activeJob.id);
+  selectedEventId = eventId;
+  activeJob = null;
+  setImportStatus(`Loaded ${rows.length} row(s) from the completed job — ${extractedRows.length} total in review.`, 'ok');
+  refreshImportSectionOnly();
+}
+
+async function handleRetryJob(){
+  if (!activeJob || activeJob.status !== 'error') return;
+  const batches = [...(activeJob.batches || [])];
+  const idx = activeJob.next_batch_index;
+  if (batches[idx]) batches[idx] = { ...batches[idx], status: 'pending', message: 'Queued for retry', attempt: 0 };
+  const { data, error } = await sb.from('import_jobs').update({
+    status: 'processing', batches, next_attempt_at: new Date().toISOString(), error_message: null
+  }).eq('id', activeJob.id).select().maybeSingle();
+  if (error) { alert(`Retry failed: ${error.message}`); return; }
+  activeJob = data;
+  startJobPolling();
+  refreshImportSectionOnly();
+}
+
+async function handleDiscardJob(){
+  if (!activeJob) return;
+  const wasProcessing = activeJob.status === 'processing';
+  await sb.from('import_jobs').update({
+    dismissed: true,
+    status: wasProcessing ? 'error' : activeJob.status,
+    error_message: wasProcessing ? 'Cancelled by admin' : activeJob.error_message
+  }).eq('id', activeJob.id);
+  stopJobPolling();
+  activeJob = null;
+  refreshImportSectionOnly();
+}
+
+function reviewTableHtml(){
+  const rows = extractedRows.map((r, i) => {
+    const isFlagged = r.existingScore != null && r.score < r.existingScore;
+    const noMatch = !r.playerId;
+    const isFuzzy = r.matchConfidence === 'fuzzy';
+    const rowClass = isFlagged ? 'flagged' : (noMatch ? 'nomatch' : (isFuzzy ? 'fuzzymatch' : ''));
+    return `
+      <tr class="${rowClass}" data-row="${i}">
+        <td><input type="checkbox" data-include="${i}" ${r.include ? 'checked' : ''}></td>
+        <td>${escapeHtml(r.name)}</td>
+        <td>
+          <select data-matchselect="${i}">
+            <option value="">— no match, pick manually —</option>
+            ${roster.map(p=>`<option value="${p.id}" ${p.id===r.playerId?'selected':''}>${escapeHtml(p.name)}</option>`).join('')}
+          </select>
+          ${isFuzzy ? `<div class="fuzzy-note">⚠ auto-matched (closest name) — please verify</div>` : ''}
+        </td>
+        <td><input type="number" data-scoreinput="${i}" value="${r.score}"></td>
+        <td>
+          ${r.existingScore != null ? `current: ${r.existingScore}` : '<span style="color:var(--text-faint)">no existing score</span>'}
+          ${isFlagged ? `<div class="flag-note">⚠ new score is lower — won't auto-save</div>` : ''}
+        </td>
+        <td>${isFlagged ? `<button class="btn force" data-forcesave="${i}">Save anyway</button>` : ''}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <table class="review-table">
+      <thead><tr><th>Use</th><th>Extracted name</th><th>Matched player</th><th>Score</th><th>Existing</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="import-row" style="margin-top:12px;">
+      <button class="btn save-all" id="saveAllBtn">Save all checked (non-flagged)</button>
+      <button class="btn force" id="clearRowsBtn">Clear all rows</button>
+    </div>
+  `;
+}
+
+function stitchGalleryHtml(){  return stitchedPreviews.map((p, i) => `
+    <div class="stitch-thumb" data-thumb="${p.id}">
+      <button class="rm" data-removepreview="${p.id}" title="Remove">✕</button>
+      <img src="${p.dataUrl}">
+      <div class="lbl"><b style="color:var(--signal);">Batch ${i+1}</b> — ${p.sourceCount} screen${p.sourceCount>1?'s':''} combined</div>
+    </div>
+  `).join('');
+}
+
+function wireImportSection(){
+  const previewBtn = document.getElementById('previewBtn');
+  if (previewBtn) previewBtn.addEventListener('click', handlePreviewStitch);
+  const eventSelect = document.getElementById('importEventSelect');
+  if (eventSelect) eventSelect.addEventListener('change', () => { selectedEventId = eventSelect.value; });
+  const sendBtn = document.getElementById('sendToGroqBtn');
+  if (sendBtn) sendBtn.addEventListener('click', handleSendToGroq);
+  const clearPreviewBtn = document.getElementById('clearPreviewBtn');
+  if (clearPreviewBtn) clearPreviewBtn.addEventListener('click', () => {
+    stitchedPreviews = [];
+    refreshImportSectionOnly();
+  });
+  document.querySelectorAll('[data-removepreview]').forEach(b => b.addEventListener('click', () => {
+    stitchedPreviews = stitchedPreviews.filter(p => p.id !== b.dataset.removepreview);
+    refreshImportSectionOnly();
+  }));
+  const newEventToggle = document.getElementById('newEventToggle');
+  if (newEventToggle) newEventToggle.addEventListener('click', () => {
+    const form = document.getElementById('newEventForm');
+    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+  });
+  const createEventBtn = document.getElementById('createEventBtn');
+  if (createEventBtn) createEventBtn.addEventListener('click', handleCreateEvent);
+
+  const jobRefreshBtn = document.getElementById('jobRefreshBtn');
+  if (jobRefreshBtn) jobRefreshBtn.addEventListener('click', pollActiveJob);
+  const jobCancelBtn = document.getElementById('jobCancelBtn');
+  if (jobCancelBtn) jobCancelBtn.addEventListener('click', handleDiscardJob);
+  const jobLoadBtn = document.getElementById('jobLoadBtn');
+  if (jobLoadBtn) jobLoadBtn.addEventListener('click', handleLoadJobResults);
+  const jobRetryBtn = document.getElementById('jobRetryBtn');
+  if (jobRetryBtn) jobRetryBtn.addEventListener('click', handleRetryJob);
+  const jobDiscardBtn = document.getElementById('jobDiscardBtn');
+  if (jobDiscardBtn) jobDiscardBtn.addEventListener('click', handleDiscardJob);
+
+  wireReviewTableEvents();
+}
+
+function refreshImportSectionOnly(){
+  document.getElementById('importBoxWrap').innerHTML = importSectionHtml();
+  wireImportSection();
+}
+
+async function handlePreviewStitch(){
+  const fileInput = document.getElementById('importFiles');
+  const files = fileInput.files;
+  if (!files || files.length === 0) { setImportStatus('Choose at least one screenshot.', 'err'); return; }
+
+  screensPerStitch = Math.max(1, parseInt(document.getElementById('screensPerStitchInput').value) || 5);
+  batchStatuses = [];
+  setImportStatus(`Building preview from ${files.length} screenshot(s)…`, '');
+  try {
+    stitchedPreviews = await buildStitchedPreviews(files, screensPerStitch);
+    setImportStatus(`${stitchedPreviews.length} batch(es) ready — check them below, then send to Groq.`, 'ok');
+  } catch (e) {
+    setImportStatus(`Couldn't build preview: ${e.message}`, 'err');
+  }
+  refreshImportSectionOnly();
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+async function handleSendToGroq(){
+  const eventId = document.getElementById('importEventSelect').value;
+  if (!eventId) { setImportStatus('Pick an event first.', 'err'); return; }
+  if (stitchedPreviews.length === 0) { setImportStatus('Nothing to send — build a preview first.', 'err'); return; }
+
+  const batches = stitchedPreviews.map((p) => ({
+    id: p.id, dataUrl: p.dataUrl, sourceCount: p.sourceCount,
+    status: 'pending', message: `Queued (${p.sourceCount} screens)`, rows: null, attempt: 0
+  }));
+
+  setImportStatus('Starting background job…', '');
+  const { data, error } = await sb.from('import_jobs').insert({
+    event_id: eventId,
+    created_by: mySession.user.id,
+    status: 'processing',
+    batches,
+    next_batch_index: 0,
+    next_attempt_at: new Date().toISOString(),
+    pacing_seconds: 65
+  }).select().maybeSingle();
+
+  if (error) { setImportStatus(`Couldn't start job: ${error.message}`, 'err'); return; }
+
+  activeJob = data;
+  stitchedPreviews = [];
+  setImportStatus('Job started — this now runs on the server (checked every minute) and keeps going even if you close this tab. Come back anytime to check progress.', 'ok');
+  startJobPolling();
+  refreshImportSectionOnly();
+}
+
+function slugifyEventId(name, date){
+  const slug = String(name||'').toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+  const dateSuffix = date ? date.replace(/-/g, '').slice(4) : ''; // MMDD
+  return `ev_${slug}${dateSuffix ? '_' + dateSuffix : ''}`;
+}
+
+async function handleCreateEvent(){
+  const name = document.getElementById('newEventName').value.trim();
+  const date = document.getElementById('newEventDate').value;
+  const arcId = document.getElementById('newEventArc').value;
+  const isTest = document.getElementById('newEventIsTest').checked;
+  const scoringType = document.getElementById('newEventScoringType').value;
+  const completionMode = document.getElementById('newEventCompletionMode').value;
+  const thresholdRaw = document.getElementById('newEventThreshold').value;
+  const statusEl = document.getElementById('newEventStatus');
+
+  if (!name || !date) { statusEl.textContent = 'Name and date are required.'; statusEl.style.color = 'var(--alert)'; return; }
+  if (!scoringType || !completionMode) { statusEl.textContent = 'Please select both a scoring type and a completion mode.'; statusEl.style.color = 'var(--alert)'; return; }
+
+  const id = slugifyEventId(name, date);
+  const insertBody = {
+    id, name, date, scoring_type: scoringType, completion_mode: completionMode,
+    start_date: date, arc_id: arcId || null, is_test: isTest
+  };
+  if (thresholdRaw !== '') insertBody.threshold = parseInt(thresholdRaw);
+
+  const { data, error } = await sb.from('events').insert(insertBody).select().maybeSingle();
+
+  if (error) { statusEl.textContent = `Error: ${error.message}`; statusEl.style.color = 'var(--alert)'; return; }
+
+  events = [data, ...events];
+  statusEl.textContent = `Created "${name}".`;
+  statusEl.style.color = 'var(--mint)';
+  const sel = document.getElementById('importEventSelect');
+  sel.innerHTML = `<option value="">— pick an event to update existing scores —</option>` + events.map(e=>`<option value="${e.id}">${escapeHtml(e.name)} (${e.date})</option>`).join('');
+  sel.value = id;
+  selectedEventId = id;
+  document.getElementById('newEventForm').style.display = 'none';
+  document.getElementById('newEventName').value = '';
+  document.getElementById('newEventThreshold').value = '';
+}
+
+function wireReviewTableEvents(){
+  document.querySelectorAll('[data-include]').forEach(cb => cb.addEventListener('change', () => {
+    extractedRows[parseInt(cb.dataset.include)].include = cb.checked;
+  }));
+  document.querySelectorAll('[data-matchselect]').forEach(sel => sel.addEventListener('change', () => {
+    const idx = parseInt(sel.dataset.matchselect);
+    extractedRows[idx].playerId = sel.value || null;
+    extractedRows[idx].matchConfidence = sel.value ? 'manual' : null;
+    refreshReviewTableOnly();
+  }));
+  document.querySelectorAll('[data-scoreinput]').forEach(inp => inp.addEventListener('input', () => {
+    const idx = parseInt(inp.dataset.scoreinput);
+    extractedRows[idx].score = parseInt(inp.value) || 0;
+    refreshReviewTableOnly();
+  }));
+  const saveAllBtn = document.getElementById('saveAllBtn');
+  if (saveAllBtn) saveAllBtn.addEventListener('click', handleSaveAll);
+  const clearRowsBtn = document.getElementById('clearRowsBtn');
+  if (clearRowsBtn) clearRowsBtn.addEventListener('click', handleClearRows);
+  document.querySelectorAll('[data-forcesave]').forEach(b => b.addEventListener('click', () => handleForceSave(parseInt(b.dataset.forcesave))));
+}
+
+function refreshReviewTableOnly(){
+  document.getElementById('reviewWrap').innerHTML = extractedRows.length ? reviewTableHtml() : '';
+  wireReviewTableEvents();
+}
+
+function setImportStatus(message, kind){
+  extractStatus = { loading: false, message, kind: kind||'' };
+  const el = document.getElementById('importStatus');
+  if (el) { el.textContent = message; el.className = `import-status ${kind||''}`; }
+}
+
+function fileToDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageFromDataUrl(dataUrl){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// Cap the assembled image's overall size so token cost stays bounded no matter
+// how many screenshots (or how high-res) go into one stitch.
+const STITCH_MAX_TOTAL_HEIGHT = 2200;
+
+async function stitchGroupIntoImage(dataUrls){
+  const imgs = await Promise.all(dataUrls.map(loadImageFromDataUrl));
+  const width = Math.max(...imgs.map(im => im.naturalWidth));
+  const scaledHeights = imgs.map(im => im.naturalHeight * (width / im.naturalWidth));
+  const totalHeight = Math.round(scaledHeights.reduce((a,b) => a+b, 0));
+
+  const shrink = totalHeight > STITCH_MAX_TOTAL_HEIGHT ? (STITCH_MAX_TOTAL_HEIGHT / totalHeight) : 1;
+  const finalWidth = Math.round(width * shrink);
+  const finalHeights = scaledHeights.map(h => Math.round(h * shrink));
+  const finalTotalHeight = finalHeights.reduce((a,b) => a+b, 0);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = finalWidth;
+  canvas.height = finalTotalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  let y = 0;
+  imgs.forEach((im, i) => {
+    ctx.drawImage(im, 0, y, finalWidth, finalHeights[i]);
+    y += finalHeights[i];
+  });
+
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+// Groups files into fixed-size chunks (screensPerStitch each) and stitches each
+// chunk into one tall image. Returns preview objects the admin can inspect and
+// remove before anything is sent to Groq.
+async function buildStitchedPreviews(files, perStitch){
+  const dataUrls = await Promise.all(Array.from(files).map(fileToDataUrl));
+  const groups = [];
+  for (let i = 0; i < dataUrls.length; i += perStitch) {
+    groups.push(dataUrls.slice(i, i + perStitch));
+  }
+  const previews = [];
+  for (let i = 0; i < groups.length; i++) {
+    const stitched = await stitchGroupIntoImage(groups[i]);
+    previews.push({ id: `p${i}`, dataUrl: stitched, sourceCount: groups[i].length });
+  }
+  return previews;
+}
+
+async function handleSaveAll(){
+  const eventId = document.getElementById('importEventSelect').value;
+  const eligible = extractedRows.filter(r => r.include && r.playerId && !(r.existingScore != null && r.score < r.existingScore));
+  // if the same player was extracted twice (e.g. across stitched batches), keep the last one
+  const byPlayer = {};
+  eligible.forEach(r => { byPlayer[r.playerId] = r; });
+  const toSave = Object.values(byPlayer);
+  if (toSave.length === 0) { setImportStatus('Nothing eligible to save — check matches and flags above.', 'err'); return; }
+
+  const upserts = toSave.map(r => ({ event_id: eventId, player_id: r.playerId, score: r.score, updated_at: new Date().toISOString() }));
+  const { error } = await sb.from('scores').upsert(upserts, { onConflict: 'event_id,player_id' });
+  if (error) { setImportStatus(`Save failed: ${error.message}`, 'err'); return; }
+
+  // Remove exactly the rows that were just saved -- leave behind anything skipped
+  // (unchecked, flagged, unmatched) so it's still visible and doesn't get silently lost.
+  const savedSet = new Set(toSave);
+  extractedRows = extractedRows.filter(r => !savedSet.has(r));
+
+  const eventName = (events.find(e => e.id === eventId) || {}).name || eventId;
+  const skippedCount = extractedRows.length;
+  refreshImportSectionOnly();
+  showSaveSuccessBanner(toSave.length, eventName, skippedCount);
+}
+
+function showSaveSuccessBanner(count, eventName, skippedCount){
+  const el = document.getElementById('saveSuccessBanner');
+  if (!el) return;
+  el.style.display = 'flex';
+  el.innerHTML = `
+    <span style="font-size:20px;">✅</span>
+    <div>
+      <div style="font-weight:700;color:var(--mint);">Saved ${count} score${count===1?'':'s'} to "${escapeHtml(eventName)}"</div>
+      ${skippedCount ? `<div style="font-size:10.5px;color:var(--text-dim);margin-top:2px;">${skippedCount} row(s) still waiting below (unchecked, flagged, or unmatched) — nothing was lost.</div>` : `<div style="font-size:10.5px;color:var(--text-dim);margin-top:2px;">Review table is clear — ready for the next upload.</div>`}
+    </div>
+  `;
+  clearTimeout(showSaveSuccessBanner._t);
+  showSaveSuccessBanner._t = setTimeout(() => { el.style.display = 'none'; }, 8000);
+}
+
+function handleClearRows(){
+  extractedRows = [];
+  document.getElementById('reviewWrap').innerHTML = '';
+  setImportStatus('Cleared.', '');
+}
+
+async function handleForceSave(idx){
+  const r = extractedRows[idx];
+  if (!r || !r.playerId) return;
+  const { error } = await sb.from('scores').upsert(
+    [{ event_id: r.eventId, player_id: r.playerId, score: r.score, updated_at: new Date().toISOString() }],
+    { onConflict: 'event_id,player_id' }
+  );
+  if (error) { setImportStatus(`Save failed: ${error.message}`, 'err'); return; }
+  r.existingScore = r.score;
+  setImportStatus(`Saved ${r.name}'s score (overwrote a higher stored value).`, 'ok');
+  refreshReviewTableOnly();
+}
+
+// ==================== end score import ====================
+
+init();
+</script>
+</body>
+</html>
