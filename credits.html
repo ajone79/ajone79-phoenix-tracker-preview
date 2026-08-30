@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="assets/phx-nav-menu.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/tracker-auth.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoenix EU168 — Links &amp; Credits</title>
+<meta name="description" content="Data sources, tools, and communities that Phoenix EU168's tracker relies on.">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-eu168.png">
+<link rel="apple-touch-icon" href="/icon-eu168.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#050507; --panel:#111116; --panel-2:#17171e; --hair:#2a2a34;
+    --signal:#ff9142; --periwinkle:#8fa3ff; --mint:#5fd068; --gold:#ffc857; --alert:#ff5a5f;
+    --text:#e8e6e1; --text-dim:#8a8a94; --text-faint:#55555f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--void);color:var(--text);font-family:'Space Mono',monospace;-webkit-font-smoothing:antialiased;}
+  main{max-width:760px;margin:0 auto;padding:28px 20px 60px;}
+  .section-head h1{font-family:'Antonio',sans-serif;font-weight:700;font-size:26px;margin:18px 0 6px;letter-spacing:.03em;}
+  .section-head .accent{color:var(--signal);}
+  .section-desc{color:var(--text-dim);font-size:12.5px;max-width:620px;line-height:1.6;margin-bottom:26px;}
+  h2{font-family:'Antonio',sans-serif;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--hair);}
+  .link-card{
+    display:flex; align-items:center; gap:14px;
+    background:var(--panel); border:1px solid var(--hair); border-radius:10px;
+    padding:14px 16px; margin-bottom:10px; text-decoration:none; color:var(--text);
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .link-card:hover{border-color:var(--signal); background:rgba(255,145,66,.05);}
+  .link-icon{
+    width:40px;height:40px;border-radius:9px;flex-shrink:0;
+    background:var(--panel-2); border:1px solid var(--hair);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Antonio',sans-serif; font-weight:700; font-size:14px; color:var(--signal);
+    overflow:hidden;
+  }
+  .link-icon img{width:100%;height:100%;object-fit:cover;}
+  .link-body{flex:1; min-width:0;}
+  .link-name{font-family:'Antonio',sans-serif;font-weight:600;font-size:15px;}
+  .link-desc{font-size:11.5px;color:var(--text-dim);margin-top:2px;line-height:1.5;}
+  .link-arrow{font-family:'Space Mono',monospace;color:var(--signal);font-size:15px;flex-shrink:0;}
+  .credit-line{
+    background:var(--panel); border:1px solid var(--hair); border-radius:10px;
+    padding:14px 16px; margin-bottom:10px; font-size:12.5px; line-height:1.7; color:var(--text-dim);
+  }
+  .credit-line b{color:var(--text);}
+  .credit-line a{color:var(--periwinkle);}
+  footer{padding:30px 16px 10px;color:var(--text-faint);font-family:'Space Mono',monospace;font-size:10.5px;text-align:center;max-width:760px;margin:0 auto;}
+  .support-link{
+    display:inline-flex;align-items:center;gap:7px;margin-top:14px;
+    padding:9px 18px;border-radius:20px;
+    background:var(--panel);border:1px solid var(--hair);
+    color:var(--text-dim);text-decoration:none;
+    font-family:'Antonio',sans-serif;font-weight:600;letter-spacing:.05em;
+    text-transform:uppercase;font-size:11px;
+    transition:border-color .15s ease,color .15s ease,background .15s ease;
+  }
+  .support-link:hover{border-color:var(--signal);color:var(--text);background:rgba(255,145,66,.08);}
+
+/* ===== PHX cross-page nav strip ===== */
+.phx-nav{
+  position:sticky; top:0; z-index:9999;
+  display:flex; align-items:center; gap:4px;
+  background:#0a0a0d; border-bottom:2px solid #f2a93b;
+  padding:0 14px; height:36px;
+  font-family:ui-monospace,'SF Mono','Consolas',monospace;
+  overflow-x:auto; white-space:nowrap;
+}
+.phx-nav .phx-nav-tag{
+  color:#f2a93b; font-weight:700; letter-spacing:.12em; font-size:11px;
+  margin-right:12px; flex-shrink:0;
+}
+.phx-nav a{
+  color:#9a9aa4; text-decoration:none; font-size:11px; letter-spacing:.06em;
+  text-transform:uppercase; padding:8px 12px; border-radius:0 0 6px 6px;
+  transition:color .15s ease, background .15s ease; flex-shrink:0;
+}
+.phx-nav a:hover{ color:#e8e6e1; background:rgba(255,255,255,.06); }
+.phx-nav a.current{ color:#0a0a0d; background:#f2a93b; font-weight:700; }
+
+/* ===== header ticker: next 2 territory captures + next 2 upcoming events (shared across all pages) ===== */
+.phx-ticker{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  background:#111116; border-bottom:2px solid #2a2a34;
+  padding:7px 22px; font-family:ui-monospace,'SF Mono','Consolas',monospace; font-size:11.5px;
+  color:#e8e6e1;
+}
+.tc-group{ display:flex; align-items:center; gap:14px; flex-shrink:0; flex-wrap:wrap; }
+.tc-next{ display:flex; align-items:center; gap:7px; }
+.tc-next .tc-label{
+  color:#0a0a0d; background:#5fd068; font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:10px;
+  padding:2px 7px; border-radius:4px; flex-shrink:0;
+}
+.tc-next.tc-then .tc-label{ background:#8fa3ff; }
+.tc-next .tc-name{ font-weight:700; }
+.tc-next .tc-countdown{ color:#5fd068; }
+.tc-next.tc-then .tc-countdown{ color:#8fa3ff; }
+.ev-ticker-wrap{
+  flex:1; min-width:200px; display:flex; align-items:center; gap:7px;
+  border-left:1px solid #2a2a34; padding-left:16px; overflow:hidden;
+}
+.ev-ticker-wrap .ev-label{
+  color:#8a8a94; font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:10px; flex-shrink:0;
+}
+#evTicker{
+  color:#8fa3ff; opacity:1; transition:opacity .4s ease;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+#evTicker .ev-sep{ color:#55555f; margin:0 8px; }
+#evTicker.fade{ opacity:0; }
+@media (max-width:820px){ .phx-ticker{ padding:7px 12px; font-size:10.5px; gap:10px;} .ev-ticker-wrap{ padding-left:10px; } .tc-group{ gap:8px; } }
+
+.hero-ticker{ display:flex; align-items:center; gap:10px; height:22px; overflow:hidden; background:rgba(242,169,59,.06); border-bottom:1px solid rgba(242,169,59,.25); padding:0 10px; }
+.hero-ticker-label{ flex:0 0 auto; color:#f2a93b; font-weight:700; font-size:10.5px; letter-spacing:.07em; font-family:'Share Tech Mono', 'Space Mono', monospace; white-space:nowrap; }
+.hero-ticker-scroll{ flex:1 1 auto; overflow:hidden; white-space:nowrap; height:100%; position:relative; }
+.hero-ticker .htrack{ display:inline-block; font-family:'Share Tech Mono', 'Space Mono', monospace; font-size:11px; line-height:22px; animation-name:heroTickerScroll; animation-timing-function:linear; animation-iteration-count:infinite; }
+.hero-ticker .hgrouphead{ color:#f2a93b; font-weight:700; letter-spacing:.05em; }
+.hero-ticker .hname{ color:#f2a93b; font-weight:700; }
+.hero-ticker .hscore{ color:#4fd1c5; }
+@keyframes heroTickerScroll{ 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+</style>
+</head>
+<body>
+<nav class="phx-nav"><span class="phx-nav-tag">PHX</span><a href="index.html">🏠 Home</a><a href="credits.html" class="current">Links &amp; Credits</a></nav>
+<div class="hero-ticker"><span class="hero-ticker-label">🏆 ALLIANCE HEROES</span><div class="hero-ticker-scroll" id="heroTicker"></div></div>
+<div class="phx-ticker">
+  <div class="tc-group">
+    <div class="tc-next" id="tcNext"><span class="tc-label">Next Capture</span><span>Loading…</span></div>
+    <div class="tc-next tc-then" id="tcThen"><span class="tc-label">Then</span><span>Loading…</span></div>
+  </div>
+  <div class="ev-ticker-wrap"><span class="ev-label">Also Upcoming</span><span id="evTicker">Loading…</span></div>
+</div>
+<script src="events-data.js"></script>
+
+<main>
+  <div class="section-head">
+    <h1>Links &amp; <span class="accent">Credits</span></h1>
+    <div class="section-desc">This tracker leans on data, spreadsheets, and communities beyond our own alliance. This page says thanks and points you to where it comes from — check these out directly for the fullest, most current picture.</div>
+  </div>
+
+  <h2>Community Sites</h2>
+  <a class="link-card" href="https://stfc.phd" target="_blank" rel="noopener">
+    <div class="link-icon"><img src="assets/icons/stfc_phd.jpg" alt="STFC.PHD"></div>
+    <div class="link-body">
+      <div class="link-name">STFC.PHD</div>
+      <div class="link-desc">Community spreadsheets and reference data — including the Alliance Tournament task list this tracker's F2P Task Guide is built from.</div>
+    </div>
+    <div class="link-arrow">↗</div>
+  </a>
+  <a class="link-card" href="https://stfc.cfd" target="_blank" rel="noopener">
+    <div class="link-icon"><img src="assets/icons/stfc_cfd.jpg" alt="STFC.CFD"></div>
+    <div class="link-body">
+      <div class="link-name">STFC.CFD</div>
+      <div class="link-desc">Community resource hub for Star Trek Fleet Command.</div>
+    </div>
+    <div class="link-arrow">↗</div>
+  </a>
+  <a class="link-card" href="https://stfc.pro" target="_blank" rel="noopener">
+    <div class="link-icon"><img src="assets/icons/stfc_stats.jpg" alt="STFC Statistics"></div>
+    <div class="link-body">
+      <div class="link-name">STFC.PRO</div>
+      <div class="link-desc">STFC statistics and reference tools for the wider community.</div>
+    </div>
+    <div class="link-arrow">↗</div>
+  </a>
+  <a class="link-card" href="https://territory.lol/" target="_blank" rel="noopener">
+    <div class="link-icon"><img src="assets/icons/territory_lol.jpg" alt="territory.lol"></div>
+    <div class="link-body">
+      <div class="link-name">territory.lol</div>
+      <div class="link-desc">Gherkin's Territory Helper — territory capture timing and planning, sourced for this site's Events Calendar.</div>
+    </div>
+    <div class="link-arrow">↗</div>
+  </a>
+
+  <h2>Discord Communities</h2>
+  <a class="link-card" href="https://discord.gg/FF3yDHtycy" target="_blank" rel="noopener">
+    <div class="link-icon"><img src="assets/icons/kali.jpg" alt="Kali STFC Resources"></div>
+    <div class="link-body">
+      <div class="link-name">Kali STFC Resources</div>
+      <div class="link-desc">Guides, tools, and community-maintained resources for STFC captains.</div>
+    </div>
+    <div class="link-arrow">↗</div>
+  </a>
+  <a class="link-card" href="https://discord.gg/BRhru6Vcnj" target="_blank" rel="noopener">
+    <div class="link-icon"><img src="assets/icons/officer_tools.jpg" alt="STFC Officer Tools"></div>
+    <div class="link-body">
+      <div class="link-name">STFC Officer Tools</div>
+      <div class="link-desc">Officer-focused tools and planning resources for alliance leadership.</div>
+    </div>
+    <div class="link-arrow">↗</div>
+  </a>
+  <a class="link-card" href="https://discord.gg/qhhErbWeaC" target="_blank" rel="noopener">
+    <div class="link-icon"><img src="assets/icons/stfc_briefings.jpg" alt="STFC Briefings: Voice of the Players"></div>
+    <div class="link-body">
+      <div class="link-name">STFC Briefings: Voice of the Players</div>
+      <div class="link-desc">Community briefings and discussion on STFC updates, events, and player feedback.</div>
+    </div>
+    <div class="link-arrow">↗</div>
+  </a>
+
+  <h2>Data &amp; Spreadsheet Credits</h2>
+  <div class="credit-line">
+    <b>Alliance Tournament M92 spreadsheet</b> — compiled by JulesVern, Quasel, BlueMandalorian &amp; the STFC community. Filtered into the <a href="f2p-task-guide.html">F2P Task Guide</a> on this site; data changes each tournament rotation, so verify in-game before heavy hoarding.
+  </div>
+</main>
+
+<footer>Maintained for Phoenix EU168 · Thanks to everyone above for the tools and data that make this possible.<br><a class="support-link" href="https://www.buymeacoffee.com/ajaykhoulo7" target="_blank" rel="noopener">🍺 Buy me a beer</a></footer>
+<script>
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* =========================================================
+   HEADER TICKER — next 2 Territory Captures (persistent) +
+   next 2 upcoming events (rotating pair).
+   Pulls from EVENTS/nextOccurrenceUTC in events-data.js — shared
+   and identical across every page so the schedule always matches.
+   ========================================================= */
+let tickerNextTerritory = [];     // [{ev, utcDate}, {ev, utcDate}] soonest first
+let tickerOtherQueue = [];        // [{ev, utcDate, label}, ...] sorted, soonest first
+let tickerRotateIdx = 0;
+let tickerStarted = false;
+
+function fmtCountdown(utcDate){
+  const diffMs = utcDate - new Date();
+  if(diffMs <= 0) return 'underway now';
+  const mins = Math.round(diffMs/60000);
+  const d = Math.floor(mins/1440);
+  const h = Math.floor((mins%1440)/60);
+  const m = mins%60;
+  const parts = [];
+  if(d) parts.push(d+'d');
+  if(h) parts.push(h+'h');
+  if(!d && m) parts.push(m+'m');
+  if(!parts.length) parts.push('<1m');
+  return 'in ' + parts.join(' ');
+}
+
+function recomputeTickerData(){
+  if(typeof EVENTS === 'undefined') return; // events-data.js not loaded
+  const now = new Date();
+
+  const territoryHits = EVENTS
+    .filter(e => e.category === 'TERRITORY')
+    .map(ev => ({ev, occ: nextOccurrenceUTC(ev, now)}))
+    .filter(x => x.occ);
+  territoryHits.sort((a,b) => a.occ.utcDate - b.occ.utcDate);
+  tickerNextTerritory = territoryHits.slice(0, 2).map(x => ({ev: x.ev, utcDate: x.occ.utcDate}));
+
+  const otherHits = EVENTS
+    .filter(e => e.category !== 'TERRITORY')
+    .map(ev => ({ev, occ: nextOccurrenceUTC(ev, now)}))
+    .filter(x => x.occ);
+  otherHits.sort((a,b) => a.occ.utcDate - b.occ.utcDate);
+  tickerOtherQueue = otherHits.slice(0, 10).map(x => ({ev: x.ev, utcDate: x.occ.utcDate, label: x.occ.label}));
+  if(tickerRotateIdx >= tickerOtherQueue.length) tickerRotateIdx = 0;
+}
+
+function updateTickerDOM(){
+  const tcEl = document.getElementById('tcNext');
+  const tcEl2 = document.getElementById('tcThen');
+  const evEl = document.getElementById('evTicker');
+  if(!tcEl || !evEl) return; // ticker not in current DOM yet
+
+  const t0 = tickerNextTerritory[0], t1 = tickerNextTerritory[1];
+  if(t0){
+    tcEl.innerHTML = `<span class="tc-label">Next Capture</span><span class="tc-name">${escapeHtml(t0.ev.name.replace(' — Territory Capture',''))}</span><span class="tc-countdown">${fmtCountdown(t0.utcDate)}</span>`;
+  } else {
+    tcEl.innerHTML = `<span class="tc-label">Next Capture</span><span>None scheduled</span>`;
+  }
+  if(tcEl2){
+    if(t1){
+      tcEl2.innerHTML = `<span class="tc-label">Then</span><span class="tc-name">${escapeHtml(t1.ev.name.replace(' — Territory Capture',''))}</span><span class="tc-countdown">${fmtCountdown(t1.utcDate)}</span>`;
+      tcEl2.style.display = '';
+    } else {
+      tcEl2.style.display = 'none';
+    }
+  }
+
+  if(tickerOtherQueue.length){
+    const cur = tickerOtherQueue[tickerRotateIdx];
+    const next = tickerOtherQueue.length > 1 ? tickerOtherQueue[(tickerRotateIdx+1) % tickerOtherQueue.length] : null;
+    let html = `${escapeHtml(cur.ev.name)} — ${fmtCountdown(cur.utcDate)}`;
+    if(next && next !== cur){
+      html += `<span class="ev-sep">·</span>${escapeHtml(next.ev.name)} — ${fmtCountdown(next.utcDate)}`;
+    }
+    evEl.innerHTML = html;
+  } else {
+    evEl.textContent = 'Nothing else on the schedule right now';
+  }
+}
+
+function rotateTicker(){
+  const evEl = document.getElementById('evTicker');
+  if(!evEl || tickerOtherQueue.length < 3) { updateTickerDOM(); return; }
+  evEl.classList.add('fade');
+  setTimeout(() => {
+    tickerRotateIdx = (tickerRotateIdx + 1) % tickerOtherQueue.length;
+    updateTickerDOM();
+    evEl.classList.remove('fade');
+  }, 400);
+}
+
+function startHeaderTicker(){
+  if(tickerStarted) return;
+  tickerStarted = true;
+  recomputeTickerData();
+  updateTickerDOM();
+  setInterval(rotateTicker, 5500);          // slide the "also upcoming" pair
+  setInterval(() => { recomputeTickerData(); updateTickerDOM(); }, 60000); // refresh countdowns + reorder queue
+}
+startHeaderTicker();
+</script>
+<script>
+(function(){
+  try{
+    fetch('https://mmzizgsanwqjpiumpqay.supabase.co/rest/v1/page_views', {
+      method: 'POST',
+      headers: {
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1teml6Z3NhbndxanBpdW1wcWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjk5MzksImV4cCI6MjEwMTYwNTkzOX0.KqvY2Ib33J8h8ztEi8qxtfutSdVIPAaJRtj7cSUSKFM',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        site: 'phoenix-tracker',
+        path: location.pathname,
+        referrer: document.referrer || null
+      })
+    });
+  }catch(e){}
+})();
+</script>
+
+<script>
+(function(){
+  const SUPABASE_URL = 'https://mmzizgsanwqjpiumpqay.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1teml6Z3NhbndxanBpdW1wcWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjk5MzksImV4cCI6MjEwMTYwNTkzOX0.KqvY2Ib33J8h8ztEi8qxtfutSdVIPAaJRtj7cSUSKFM';
+
+  async function sb(path){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+    });
+    if(!res.ok) throw new Error('fetch failed ' + res.status);
+    return res.json();
+  }
+
+  function escapeHtmlHero(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function gradeForLevelHero(level){
+    level = Number(level);
+    if(level <= 20) return 'G1';
+    return 'G' + (Math.floor((level - 21) / 10) + 2);
+  }
+
+  async function loadHeroes(){
+    const el = document.getElementById('heroTicker');
+    if(!el) return;
+    try{
+      const [scores, roster, eventsList] = await Promise.all([
+        sb('scores?select=player_id,score,event_id'),
+        sb('roster?select=id,name,status,level'),
+        sb('events?select=id,is_test')
+      ]);
+      const nameMap = {};
+      roster.forEach(r => { nameMap[r.id] = r; });
+      const testEventIds = new Set(eventsList.filter(e => e.is_test).map(e => e.id));
+      const totals = {};
+      scores.forEach(s => {
+        if(testEventIds.has(s.event_id)) return; // never count test/demo events
+        totals[s.player_id] = (totals[s.player_id] || 0) + Number(s.score || 0);
+      });
+      const list = Object.keys(totals)
+        .map(id => ({
+          id,
+          name: nameMap[id] ? nameMap[id].name : id,
+          status: nameMap[id] ? nameMap[id].status : 'active',
+          grade: nameMap[id] ? gradeForLevelHero(nameMap[id].level) : null,
+          total: totals[id]
+        }))
+        .filter(x => x.status === 'active' && x.grade && x.total > 0); // zero-scorers never shown, no padding
+
+      if(!list.length){ el.innerHTML = ''; return; }
+
+      const byGrade = {};
+      list.forEach(x => { (byGrade[x.grade] = byGrade[x.grade] || []).push(x); });
+      const grades = Object.keys(byGrade).sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+
+      let segments = '';
+      let entryCount = 0;
+      grades.forEach(g => {
+        const top5 = byGrade[g].sort((a, b) => b.total - a.total).slice(0, 5); // fewer than 5 real scorers = fewer entries, never padded
+        if(!top5.length) return;
+        const items = top5.map((h, i) => `<span class="hname">#${i+1} ${escapeHtmlHero(h.name)}</span> <span class="hscore">${h.total.toLocaleString()} pts</span>`).join('&nbsp;&nbsp;\u00b7&nbsp;&nbsp;');
+        segments += `<span class="hgrouphead">${g}</span>&nbsp;&nbsp;${items}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`;
+        entryCount += top5.length;
+      });
+
+      const duration = Math.max(18, entryCount * 3);
+      el.innerHTML = `<div class="htrack" style="animation-duration:${duration}s;">${segments}${segments}</div>`;
+    }catch(e){
+      console.error(e);
+      el.innerHTML = '';
+    }
+  }
+  loadHeroes();
+})();
+</script>
+</body>
+</html>
