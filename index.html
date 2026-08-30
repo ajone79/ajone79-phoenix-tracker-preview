@@ -271,8 +271,8 @@
 
 <main>
   <div class="section-head">
-    <h1>Alliance <span class="accent">Briefing</span></h1>
-    <div class="section-desc">Current arc overview, suggested crews, promo codes &amp; trivia answers — updated as the game moves.</div>
+    <h1 id="briefingHeading">Alliance <span class="accent">Briefing</span></h1>
+    <div class="section-desc" id="briefingSubtitle">Current arc overview, suggested crews, promo codes &amp; trivia answers — updated as the game moves.</div>
   </div>
 
   <div class="quick-nav">
@@ -282,12 +282,12 @@
     <a href="#trivia">Trivia Answers</a>
   </div>
 
-  <div class="wip-banner">🚧 This whole page is a work in progress. Everything below — arc overview, suggested crews, promo codes, and trivia — is <strong>placeholder content</strong> to preview the layout, not confirmed data for this arc. Real content will replace it as it's finalised.</div>
+  <div class="wip-banner" id="wipBanner" style="display:none;"></div>
 
   <section class="block" id="overview">
     <h2>Arc Overview</h2>
     <div class="block-sub">What this arc is about, key mechanics, and timeline. Tap a card to view full size.</div>
-    <iframe id="patchNotesFrame" src="arc-content/m94-1-patch-notes.html" title="M94.1 Cause & Effect Mid Arc Patch Notes" loading="lazy" style="width:100%;border:0;border-radius:16px;display:block;margin-bottom:16px;min-height:400px;"></iframe>
+    <iframe id="patchNotesFrame" title="M94.1 Cause & Effect Mid Arc Patch Notes" loading="lazy" style="width:100%;border:0;border-radius:16px;display:none;margin-bottom:16px;min-height:400px;"></iframe>
     <div class="gallery" id="overviewGallery"></div>
   </section>
 
@@ -420,25 +420,10 @@ loadTrivia();
   window.addEventListener('resize', resize);
 })();
 
-// --- Arc Overview & Suggested Crews galleries ---
-// To add more later: just add another object to these arrays.
-const OVERVIEW_ITEMS = [
-  {
-    title: "U.S.S. Excelsior / V'ger Challenge (placeholder example)",
-    image: "assets/arc/arc-vger-overview.png",
-    caption: "Placeholder only — not confirmed for this arc. Official STFC breakdown of the V'ger Challenge Track, Search and Destroy Daily Challenge, Excelsior's Enhance ability, and the Challenge Refinery, shown here just to preview the layout.",
-    credit: "Source: Star Trek Fleet Command"
-  }
-];
-
-const CREW_ITEMS = [
-  {
-    title: "V'ger Challenge Hostiles — Crew Sheet (placeholder example)",
-    image: "assets/arc/crews-blue-vger.jpg",
-    caption: "Placeholder only — not confirmed for this arc. Bridge/below-deck officer setups per hostile, shown here just to preview the layout.",
-    credit: "Crews by BlueMandalorian"
-  }
-];
+// --- Home content, settings, and Arc Overview & Suggested Crews galleries ---
+// All of this now comes from Supabase (home_content / home_gallery_items) so it can be
+// edited from home-admin.html without touching this file.
+let galleryData = { overviewGallery: [], crewsGallery: [] };
 
 function renderGallery(containerId, items){
   const el = document.getElementById(containerId);
@@ -457,10 +442,47 @@ function renderGallery(containerId, items){
     </div>
   `).join('');
 }
-renderGallery('overviewGallery', OVERVIEW_ITEMS);
-renderGallery('crewsGallery', CREW_ITEMS);
 
-const galleryData = { overviewGallery: OVERVIEW_ITEMS, crewsGallery: CREW_ITEMS };
+async function loadHomeContent(){
+  try{
+    const rows = await sb('home_content?select=*&id=eq.1');
+    const c = rows[0];
+    if(!c) return;
+    document.getElementById('briefingHeading').innerHTML = escapeHtml(c.heading).replace(/\s+(\S+)$/, ' <span class="accent">$1</span>');
+    document.getElementById('briefingSubtitle').textContent = c.subtitle;
+    const banner = document.getElementById('wipBanner');
+    if(c.wip_banner_enabled && c.wip_banner_text){
+      banner.innerHTML = '🚧 ' + escapeHtml(c.wip_banner_text);
+      banner.style.display = '';
+    } else {
+      banner.style.display = 'none';
+    }
+    const frame = document.getElementById('patchNotesFrame');
+    if(c.patch_notes_url){
+      frame.src = c.patch_notes_url;
+      frame.style.display = 'block';
+    }
+  }catch(e){ console.error('loadHomeContent failed', e); }
+}
+
+async function loadGalleries(){
+  try{
+    const rows = await sb('home_gallery_items?select=*&order=gallery.asc,sort_order.asc');
+    const overview = rows.filter(r => r.gallery === 'overview').map(r => ({title:r.title, image:r.image_url, caption:r.caption, credit:r.credit}));
+    const crews = rows.filter(r => r.gallery === 'crews').map(r => ({title:r.title, image:r.image_url, caption:r.caption, credit:r.credit}));
+    galleryData = { overviewGallery: overview, crewsGallery: crews };
+    renderGallery('overviewGallery', overview);
+    renderGallery('crewsGallery', crews);
+  }catch(e){
+    console.error('loadGalleries failed', e);
+    renderGallery('overviewGallery', []);
+    renderGallery('crewsGallery', []);
+  }
+}
+
+loadHomeContent();
+loadGalleries();
+
 const glightbox = document.getElementById('glightbox');
 
 function openGlightbox(item){
