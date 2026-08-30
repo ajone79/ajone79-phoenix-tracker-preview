@@ -7,7 +7,6 @@
     {href:'/crewing.html', label:'Crewing', icon:'🖖'},
   ];
   const MORE = [
-    {href:'/fleet-commanders.html', label:'Fleet Commanders', icon:'🧭', desc:'Best FC for your goal'},
     {href:'/sheets/stfc-sheets.html', label:'STFC Sheets', icon:'📑', desc:'Planning & calculation tools'},
     {href:'/credits.html', label:'Links & Credits', icon:'🔗', desc:'External links, thanks'},
     {href:'/admin.html', label:'Admin', icon:'🛠️', desc:'Approve logins, manage admins', adminOnly:true},
