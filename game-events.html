@@ -108,12 +108,12 @@
   .chip{
     font-family:var(--mono); font-size:11px; letter-spacing:.03em;
     padding:6px 10px; border-radius:20px;
-    border:1px solid var(--border); background:var(--panel-alt);
-    color:var(--muted); cursor:pointer; user-select:none;
+    border:1px solid var(--chip-color, var(--border)); background:transparent;
+    color:var(--chip-color, var(--muted)); cursor:pointer; user-select:none;
     display:inline-flex; align-items:center; gap:6px;
     transition:border-color .15s, color .15s, background .15s;
   }
-  .chip.on{color:var(--text); border-color:currentColor; background:rgba(255,255,255,0.03);}
+  .chip.on{color:#05070a; border-color:var(--chip-color, currentColor); background:var(--chip-color, currentColor); font-weight:700;}
   .chip-sm{font-size:9.5px; padding:4px 8px;}
   .chip-clear{color:var(--red); border-color:var(--red); font-weight:700;}
   .search-wrap{flex:1; min-width:160px;}
@@ -391,13 +391,19 @@ function buildChips(){
   const wrap = el('keyChipRow');
   wrap.innerHTML = '';
 
+  const allOff = activeTypes.size === 0 && !ticketedVisible;
   const clearChip = document.createElement('div');
   clearChip.className = 'chip chip-sm chip-clear';
-  clearChip.textContent = 'Clear All';
-  clearChip.title = 'Hide everything, then pick just the ones you want';
+  clearChip.textContent = allOff ? 'Select All' : 'Clear All';
+  clearChip.title = allOff ? 'Show every event type' : 'Hide everything, then pick just the ones you want';
   clearChip.addEventListener('click', () => {
-    activeTypes.clear();
-    ticketedVisible = false;
+    if(allOff){
+      activeTypes = new Set(Object.keys(GAME_CATS));
+      ticketedVisible = true;
+    } else {
+      activeTypes.clear();
+      ticketedVisible = false;
+    }
     buildChips(); render();
   });
   wrap.appendChild(clearChip);
@@ -406,7 +412,7 @@ function buildChips(){
     const cat = GAME_CATS[key];
     const chip = document.createElement('div');
     chip.className = 'chip chip-sm' + (activeTypes.has(key) ? ' on' : '');
-    chip.style.color = cat.color;
+    chip.style.setProperty('--chip-color', cat.color);
     chip.textContent = cat.label;
     chip.title = 'Toggle this type on/off';
     chip.addEventListener('click', () => {
@@ -417,7 +423,7 @@ function buildChips(){
   });
   const ticketedChip = document.createElement('div');
   ticketedChip.className = 'chip chip-sm' + (ticketedVisible ? ' on' : '');
-  ticketedChip.style.color = '#FFD54F';
+  ticketedChip.style.setProperty('--chip-color', '#FFD54F');
   ticketedChip.textContent = 'Ticketed';
   ticketedChip.title = 'Toggle ticketed events on/off';
   ticketedChip.addEventListener('click', () => { ticketedVisible = !ticketedVisible; buildChips(); render(); });
@@ -429,7 +435,7 @@ function buildGradeChips(){
   Object.keys(GRADE_BANDS).forEach(g => {
     const chip = document.createElement('div');
     chip.className = 'chip' + (selectedGrade === g ? ' on' : '');
-    chip.style.color = 'var(--blue)';
+    chip.style.setProperty('--chip-color', 'var(--blue)');
     chip.textContent = g;
     chip.title = 'Ops ' + GRADE_BANDS[g][0] + '–' + GRADE_BANDS[g][1] + ' — tap to isolate, tap again for all grades';
     chip.addEventListener('click', () => {
