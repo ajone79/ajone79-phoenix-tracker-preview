@@ -27,8 +27,8 @@ GUILD_ID = "1051080483167019098"
 # Add/remove channels here as needed — channel_label is just a friendly name
 # used on the home screen, it has no effect on Discord itself.
 CHANNELS = [
-    {"id": "1145220724471115848", "label": "Channel A"},
-    {"id": "1059056234206089216", "label": "Channel B"},
+    {"id": "1145220724471115848", "label": "STFC Official Announcements"},
+    {"id": "1059056234206089216", "label": "Phoenix Announcements"},
 ]
 
 MESSAGES_PER_CHANNEL = 20
