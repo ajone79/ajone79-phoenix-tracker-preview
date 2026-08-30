@@ -10,6 +10,7 @@
     {href:'/sheets/stfc-sheets.html', label:'STFC Sheets', icon:'📑', desc:'Planning & calculation tools'},
     {href:'/credits.html', label:'Links & Credits', icon:'🔗', desc:'External links, thanks'},
     {href:'/admin.html', label:'Admin', icon:'🛠️', desc:'Approve logins, manage admins', adminOnly:true},
+    {href:'/home-admin.html', label:'Home Screen Admin', icon:'🖋️', desc:'Edit briefing, galleries, codes & trivia', homeEditorOnly:true},
   ];
 
   function init(){
@@ -59,9 +60,10 @@
 
     let profile = window.__trackerProfile || null;
     function isAdmin(){ return !!(profile && profile.is_admin); }
+    function isHomeEditor(){ return !!(profile && (profile.is_owner || profile.is_home_editor)); }
 
     function moreItemsHtml(){
-      return MORE.filter(m => !m.adminOnly || isAdmin()).map(m =>
+      return MORE.filter(m => (!m.adminOnly || isAdmin()) && (!m.homeEditorOnly || isHomeEditor())).map(m =>
         `<a href="${m.href}"><span class="pm-ic">${m.icon}</span><span><span class="pm-t">${m.label}</span><br><span class="pm-d">${m.desc}</span></span></a>`
       ).join('');
     }
