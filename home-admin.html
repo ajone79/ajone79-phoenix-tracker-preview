@@ -64,6 +64,19 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+async function uploadHomeImage(file, statusEl){
+  if(!file) return null;
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  if(statusEl) statusEl.textContent = 'Uploading…';
+  const { error } = await sb.storage.from('home-images').upload(path, file, { cacheControl: '3600', upsert: false });
+  if(error){ if(statusEl) statusEl.textContent = 'Upload failed: ' + error.message; return null; }
+  const { data } = sb.storage.from('home-images').getPublicUrl(path);
+  if(statusEl) statusEl.textContent = 'Uploaded ✓';
+  return data.publicUrl;
+}
+
+
 let me = null;
 let homeContent = null;
 let galleryItems = [];
@@ -166,7 +179,11 @@ function galleryItemCardHtml(item){
         <div class="field narrow"><label>Sort order</label><input type="number" data-g="sort_order" value="${item.sort_order}"></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Image path (relative to site root)</label><input type="text" data-g="image_url" value="${escapeHtml(item.image_url)}"></div>
+        <div class="field"><label>Image URL (uploaded, or an existing path in the repo)</label><input type="text" data-g="image_url" value="${escapeHtml(item.image_url)}"></div>
+      </div>
+      <div class="field-row" style="align-items:center;">
+        <div class="field"><label>Or upload a new image</label><input type="file" accept="image/*" data-gfile="${item.id}"></div>
+        <span class="save-status" data-gfilestatus="${item.id}"></span>
       </div>
       <div class="field-row">
         <div class="field"><label>Caption</label><textarea data-g="caption">${escapeHtml(item.caption)}</textarea></div>
@@ -193,7 +210,11 @@ function gallerySectionHtml(galleryKey, title, sub){
         <div class="field narrow"><label>Sort order</label><input type="number" id="new-${galleryKey}-sort" value="${items.length}"></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Image path (relative to site root)</label><input type="text" id="new-${galleryKey}-image" placeholder="assets/arc/example.jpg"></div>
+        <div class="field"><label>Image URL (uploaded, or an existing path in the repo)</label><input type="text" id="new-${galleryKey}-image" placeholder="Upload below, or paste an existing repo path"></div>
+      </div>
+      <div class="field-row" style="align-items:center;">
+        <div class="field"><label>Upload image</label><input type="file" accept="image/*" id="new-${galleryKey}-imagefile"></div>
+        <span class="save-status" id="new-${galleryKey}-imagestatus"></span>
       </div>
       <div class="field-row">
         <div class="field"><label>Caption</label><textarea id="new-${galleryKey}-caption"></textarea></div>
@@ -234,6 +255,23 @@ function wireGallerySection(galleryKey){
       galleryItems = galleryItems.filter(g => g.id !== id);
       render();
     });
+  });
+  document.querySelectorAll('[data-gfile]').forEach(input => {
+    input.addEventListener('change', async (e) => {
+      const id = parseInt(e.target.dataset.gfile);
+      const statusEl = document.querySelector(`[data-gfilestatus="${id}"]`);
+      const url = await uploadHomeImage(e.target.files[0], statusEl);
+      if(url){
+        const card = e.target.closest('.item-card');
+        card.querySelector('[data-g=image_url]').value = url;
+      }
+    });
+  });
+  const newFileInput = document.getElementById(`new-${galleryKey}-imagefile`);
+  if(newFileInput) newFileInput.addEventListener('change', async (e) => {
+    const statusEl = document.getElementById(`new-${galleryKey}-imagestatus`);
+    const url = await uploadHomeImage(e.target.files[0], statusEl);
+    if(url) document.getElementById(`new-${galleryKey}-image`).value = url;
   });
   const addBtn = document.querySelector(`[data-addgallery="${galleryKey}"]`);
   if (addBtn) addBtn.addEventListener('click', async () => {
